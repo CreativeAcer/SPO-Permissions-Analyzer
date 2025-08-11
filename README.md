@@ -197,6 +197,7 @@ Examples of supported URLs:
 ├── 📂 Functions/                    # Core functionality
 │   ├── 📂 Core/                    # Foundation components
 │   │   ├── Settings.ps1            # In-memory settings management
+│   │   ├── SharePointDataManager.ps1 # Management for retrieved data
 │   │   └── Logging.ps1             # Activity and error logging
 │   ├── 📂 SharePoint/              # SharePoint operations
 │   │   └── SPOConnection.ps1       # Authentication and data retrieval
