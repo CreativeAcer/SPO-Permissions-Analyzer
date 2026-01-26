@@ -8,40 +8,40 @@ function Initialize-OperationsTab {
 
         # Initialize data manager
         Initialize-SharePointDataManager
-        
+
         # Set up event handlers using data-driven approach
-        $script:btnGetSites.Add_Click({ 
+        $script:btnGetSites.Add_Click({
             if (Get-AppSetting -SettingName "DemoMode") {
                 Get-DemoSites-DataDriven
             } else {
                 Get-RealSites-DataDriven
             }
         })
-        
-        $script:btnGetPermissions.Add_Click({ 
+
+        $script:btnGetPermissions.Add_Click({
             if (Get-AppSetting -SettingName "DemoMode") {
                 Get-DemoPermissions-DataDriven
             } else {
                 Get-RealPermissions-DataDriven
             }
         })
-        
-        $script:btnGenerateReport.Add_Click({ 
+
+        $script:btnGenerateReport.Add_Click({
             if (Get-AppSetting -SettingName "DemoMode") {
-                Generate-DemoReport-DataDriven
+                Generate-DemoReport
             } else {
-                Generate-RealReport-DataDriven
+                Generate-RealReport
             }
         })
-        
+
         # Set initial state
         $script:txtOperationsResults.Text = "Connect to SharePoint to begin operations..."
-        
+
         # Disable buttons initially
         $script:btnGetSites.IsEnabled = $false
         $script:btnGetPermissions.IsEnabled = $false
         $script:btnGenerateReport.IsEnabled = $false
-        
+
         Write-ActivityLog "Operations tab initialized successfully with data-driven approach" -Level "Information"
     }
     catch {
@@ -49,125 +49,6 @@ function Initialize-OperationsTab {
         throw
     }
 }
-
-# function Get-SharePointSites {
-#     <#
-#     .SYNOPSIS
-#     Retrieves and displays SharePoint sites with real-time console updates
-#     #>
-#     try {
-#         Write-ActivityLog "Starting SharePoint sites retrieval" -Level "Information"
-        
-#         # Clear previous results and show starting message
-#         Write-ConsoleOutput "🔍 SHAREPOINT SITES ANALYSIS" -ForceUpdate
-#         Write-ConsoleOutput "=====================================================" -Append -ForceUpdate
-#         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
-#         Write-ConsoleOutput "" -Append -ForceUpdate
-        
-#         if (Get-AppSetting -SettingName "DemoMode") {
-#             Get-DemoSites-DataDriven
-#         } else {
-#             Get-RealSites-DataDriven
-#         }
-        
-#         Write-ActivityLog "SharePoint sites retrieval completed" -Level "Information"
-#     }
-#     catch {
-#         Write-ConsoleOutput "❌ ERROR: Failed to retrieve SharePoint sites" -Append
-#         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
-#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-SharePointSites"
-#     }
-# }
-
-# function Get-RealSites-DataDriven {
-#     <#
-#     .SYNOPSIS
-#     Retrieves real SharePoint sites and stores in data manager
-#     #>
-#     try {
-#         if (-not $script:SPOConnected) {
-#             throw "Not connected to SharePoint. Please connect first."
-#         }
-        
-#         # Clear previous sites data
-#         Clear-SharePointData -DataType "Sites"
-#         Set-SharePointOperationContext -OperationType "Sites Analysis"
-        
-#         Write-ConsoleOutput "🔄 Using modern PnP PowerShell for site enumeration..." -Append -ForceUpdate
-#         Write-ConsoleOutput "📡 Attempting modern tenant-level site enumeration..." -Append -ForceUpdate
-#         Update-UIAndWait -WaitMs 1000
-        
-#         $sites = @()
-        
-#         # Try to get sites (your existing logic)
-#         try {
-#             $sites = Get-PnPTenantSite -ErrorAction Stop
-#             Write-ActivityLog "Retrieved $($sites.Count) sites using Get-PnPTenantSite"
-#         }
-#         catch {
-#             # Fallback logic
-#             $currentWeb = Get-PnPWeb -ErrorAction Stop
-#             $subsites = Get-PnPSubWeb -Recurse -ErrorAction SilentlyContinue
-#             $sites = @($currentWeb)
-#             if ($subsites) { $sites += $subsites }
-#         }
-        
-#         Write-ConsoleOutput "🏢 Sites Found: $($sites.Count)" -Append -ForceUpdate
-#         Write-ConsoleOutput "" -Append
-        
-#         # Process and store each site
-#         $siteCounter = 0
-#         foreach ($site in $sites | Select-Object -First 25) {
-#             $siteCounter++
-            
-#             # Create site data object
-#             $siteData = @{
-#                 Title = if ($site.Title) { $site.Title } else { "Site $siteCounter" }
-#                 Url = if ($site.Url) { $site.Url } else { "N/A" }
-#                 Owner = if ($site.Owner) { $site.Owner } elseif ($site.SiteOwnerEmail) { $site.SiteOwnerEmail } else { "N/A" }
-#                 Storage = if ($site.StorageUsageCurrent) { $site.StorageUsageCurrent.ToString() } else { "500" }
-#                 StorageQuota = if ($site.StorageQuota) { $site.StorageQuota } else { 0 }
-#                 Template = if ($site.Template) { $site.Template } else { "N/A" }
-#                 LastModified = if ($site.LastContentModifiedDate) { $site.LastContentModifiedDate.ToString() } else { "N/A" }
-#                 IsHubSite = if ($site.IsHubSite) { $site.IsHubSite } else { $false }
-#                 UserCount = 0  # Will be updated if available
-#                 GroupCount = 0  # Will be updated if available
-#             }
-            
-#             # Add site to data store
-#             Add-SharePointSite -SiteData $siteData
-            
-#             # Display in console (for user visibility)
-#             Write-ConsoleOutput "📁 SITE #$siteCounter`: $($siteData.Title)" -Append -ForceUpdate
-#             Write-ConsoleOutput "   🌐 URL: $($siteData.Url)" -Append
-#             Write-ConsoleOutput "   👤 Owner: $($siteData.Owner)" -Append
-#             Write-ConsoleOutput "   💾 Storage: $($siteData.Storage) MB" -Append
-#             if ($siteData.Template -ne "N/A") { Write-ConsoleOutput "   🎨 Template: $($siteData.Template)" -Append }
-#             if ($siteData.LastModified -ne "N/A") { Write-ConsoleOutput "   📅 Last Modified: $($siteData.LastModified)" -Append }
-#             if ($siteData.IsHubSite) { Write-ConsoleOutput "   🌟 Hub Site" -Append }
-#             Write-ConsoleOutput "   ============================================================" -Append
-#             Update-UIAndWait -WaitMs 300
-#         }
-        
-#         if ($sites.Count -gt 25) {
-#             Write-ConsoleOutput "... and $($sites.Count - 25) more sites" -Append
-#         }
-        
-#         Write-ConsoleOutput "" -Append
-#         Write-ConsoleOutput "✅ Site enumeration completed successfully!" -Append -ForceUpdate
-        
-#         # UPDATE VISUAL ANALYTICS DIRECTLY FROM DATA
-#         Update-VisualAnalyticsFromData
-        
-#         Write-ActivityLog "Sites operation completed with $($sites.Count) sites" -Level "Information"
-        
-#     }
-#     catch {
-#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealSites-DataDriven"
-#         Write-ConsoleOutput "❌ ERROR: Site enumeration failed" -Append
-#         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
-#     }
-# }
 
 function Get-RealSites-DataDriven {
     <#
@@ -178,33 +59,33 @@ function Get-RealSites-DataDriven {
         if (-not $script:SPOConnected) {
             throw "Not connected to SharePoint. Please connect first."
         }
-        
+
         # Clear previous sites data and set context
         Clear-SharePointData -DataType "Sites"
         Set-SharePointOperationContext -OperationType "Sites Analysis"
-        
+
         # Clear console and show header
         Write-ConsoleOutput "🔍 SHAREPOINT SITES ANALYSIS" -ForceUpdate
         Write-ConsoleOutput "=====================================================" -Append -ForceUpdate
         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append -ForceUpdate
-        
+
         Write-ConsoleOutput "🔄 Using modern PnP PowerShell for site enumeration..." -Append -ForceUpdate
         Write-ConsoleOutput "📡 Attempting tenant-level site enumeration..." -Append -ForceUpdate
         Update-UIAndWait -WaitMs 1000
-        
+
         $sites = @()
         $requiresAdmin = $false
-        
+
         # Try to get sites with full details
         try {
             Write-ConsoleOutput "🔍 Scanning tenant for site collections..." -Append -ForceUpdate
-            
+
             # Check if we need admin connection
             $tenantUrl = Get-AppSetting -SettingName "SharePoint.TenantUrl"
             $adminUrl = $tenantUrl -replace "\.sharepoint\.com", "-admin.sharepoint.com"
             $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
-            
+
             # Try admin connection first for best results
             try {
                 Write-ConsoleOutput "🔐 Attempting admin center connection for full details..." -Append -ForceUpdate
@@ -217,7 +98,7 @@ function Get-RealSites-DataDriven {
             catch {
                 Write-ActivityLog "Admin connection failed, trying regular connection: $($_.Exception.Message)"
                 Write-ConsoleOutput "⚠️ Admin access unavailable, trying standard enumeration..." -Append -ForceUpdate
-                
+
                 # Fallback to regular tenant connection
                 Connect-PnPOnline -Url $tenantUrl -ClientId $clientId -Interactive -ErrorAction Stop
                 $sites = Get-PnPTenantSite -ErrorAction Stop
@@ -227,27 +108,27 @@ function Get-RealSites-DataDriven {
         catch {
             Write-ActivityLog "Tenant-level enumeration failed: $($_.Exception.Message)"
             Write-ConsoleOutput "⚠️ Tenant-level access limited, using fallback method..." -Append -ForceUpdate
-            
+
             # Final fallback - get current site only
             try {
                 $currentWeb = Get-PnPWeb -ErrorAction Stop
                 $currentSite = Get-PnPSite -Includes Usage -ErrorAction Stop
-                
+
                 # Create a site object that matches the structure
                 $siteObj = [PSCustomObject]@{
                     Title = $currentWeb.Title
                     Url = $currentWeb.Url
-                    StorageUsageCurrent = if ($currentSite.Usage -and $currentSite.Usage.Storage) { 
-                        [math]::Round($currentSite.Usage.Storage / 1MB, 0) 
+                    StorageUsageCurrent = if ($currentSite.Usage -and $currentSite.Usage.Storage) {
+                        [math]::Round($currentSite.Usage.Storage / 1MB, 0)
                     } else { 0 }
-                    StorageQuota = if ($currentSite.Usage -and $currentSite.Usage.StoragePercentageUsed) { 
-                        [math]::Round($currentSite.Usage.StoragePercentageUsed * 100, 0) 
+                    StorageQuota = if ($currentSite.Usage -and $currentSite.Usage.StoragePercentageUsed) {
+                        [math]::Round($currentSite.Usage.StoragePercentageUsed * 100, 0)
                     } else { 0 }
                     Template = $currentWeb.WebTemplate
                     LastContentModifiedDate = $currentWeb.LastItemModifiedDate
                     Owner = "Current User"
                 }
-                
+
                 $sites = @($siteObj)
                 Write-ConsoleOutput "📂 Found current site only" -Append -ForceUpdate
             }
@@ -255,22 +136,22 @@ function Get-RealSites-DataDriven {
                 throw "Unable to retrieve any sites. SharePoint Administrator permissions may be required."
             }
         }
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "📊 SITES DISCOVERY RESULTS" -Append -ForceUpdate
         Write-ConsoleOutput "=" * 50 -Append
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "🏢 Sites Found: $($sites.Count)" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append
-        
+
         # Process and store each site with proper storage data
         $siteCounter = 0
         foreach ($site in $sites | Select-Object -First 25) {
             $siteCounter++
-            
+
             # Extract storage value properly based on the object type
             $storageValue = 0
-            
+
             # For tenant sites (from Get-PnPTenantSite)
             if ($site.StorageUsageCurrent -ne $null) {
                 $storageValue = [int]$site.StorageUsageCurrent
@@ -292,7 +173,7 @@ function Get-RealSites-DataDriven {
                     Write-ActivityLog "Could not get storage for site: $($site.Url)" -Level "Warning"
                 }
             }
-            
+
             # Create site data object with proper storage
             $siteData = @{
                 Title = if ($site.Title) { $site.Title } else { "Site $siteCounter" }
@@ -301,26 +182,26 @@ function Get-RealSites-DataDriven {
                 Storage = $storageValue.ToString()  # Real storage value
                 StorageQuota = if ($site.StorageQuota) { $site.StorageQuota } else { 0 }
                 Template = if ($site.Template) { $site.Template } else { "N/A" }
-                LastModified = if ($site.LastContentModifiedDate) { 
-                    $site.LastContentModifiedDate.ToString("yyyy-MM-dd") 
+                LastModified = if ($site.LastContentModifiedDate) {
+                    $site.LastContentModifiedDate.ToString("yyyy-MM-dd")
                 } else { "N/A" }
                 IsHubSite = if ($site.IsHubSite) { $site.IsHubSite } else { $false }
                 UserCount = 0
                 GroupCount = 0
             }
-            
+
             # Add site to data store
             Add-SharePointSite -SiteData $siteData
-            
+
             # Display in console with real storage value
             Write-ConsoleOutput "📁 SITE #$siteCounter`: $($siteData.Title)" -Append -ForceUpdate
             Write-ConsoleOutput "   🌐 URL: $($siteData.Url)" -Append
             Write-ConsoleOutput "   👤 Owner: $($siteData.Owner)" -Append
             Write-ConsoleOutput "   💾 Storage: $storageValue MB" -Append  # Show real value
-            if ($siteData.StorageQuota -gt 0) { 
+            if ($siteData.StorageQuota -gt 0) {
                 $quotaMB = [math]::Round($siteData.StorageQuota / 1MB, 0)
-                $percentUsed = if ($quotaMB -gt 0) { 
-                    [math]::Round(($storageValue / $quotaMB) * 100, 1) 
+                $percentUsed = if ($quotaMB -gt 0) {
+                    [math]::Round(($storageValue / $quotaMB) * 100, 1)
                 } else { 0 }
                 Write-ConsoleOutput "   📊 Storage Quota: $quotaMB MB ($percentUsed% used)" -Append
             }
@@ -330,12 +211,12 @@ function Get-RealSites-DataDriven {
             Write-ConsoleOutput "   ============================================================" -Append
             Update-UIAndWait -WaitMs 300
         }
-        
+
         if ($sites.Count -gt 25) {
             Write-ConsoleOutput "... and $($sites.Count - 25) more sites" -Append
             Write-ConsoleOutput "" -Append
         }
-        
+
         # Show storage summary
         $totalStorage = 0
         $sitesWithStorage = 0
@@ -347,7 +228,7 @@ function Get-RealSites-DataDriven {
                 $sitesWithStorage++
             }
         }
-        
+
         if ($sitesWithStorage -gt 0) {
             $totalGB = [math]::Round($totalStorage / 1024, 2)
             $avgMB = [math]::Round($totalStorage / $sitesWithStorage, 0)
@@ -357,7 +238,7 @@ function Get-RealSites-DataDriven {
             Write-ConsoleOutput "   • Average per Site: $avgMB MB" -Append
             Write-ConsoleOutput "   • Sites with Storage Data: $sitesWithStorage/$($sites.Count)" -Append
         }
-        
+
         if (-not $requiresAdmin -and $sitesWithStorage -eq 0) {
             Write-ConsoleOutput "" -Append
             Write-ConsoleOutput "⚠️ Note: Storage data requires SharePoint Administrator permissions" -Append
@@ -365,15 +246,15 @@ function Get-RealSites-DataDriven {
             Write-ConsoleOutput "   1. You have SharePoint Administrator role" -Append
             Write-ConsoleOutput "   2. Or connect to the admin center URL" -Append
         }
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ Site enumeration completed successfully!" -Append -ForceUpdate
-        
+
         # UPDATE VISUAL ANALYTICS DIRECTLY FROM DATA
         Update-VisualAnalyticsFromData
-        
+
         Write-ActivityLog "Sites operation completed with $($sites.Count) sites" -Level "Information"
-        
+
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealSites-DataDriven"
@@ -382,182 +263,6 @@ function Get-RealSites-DataDriven {
         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
     }
 }
-
-# function Get-SharePointPermissions {
-#     <#
-#     .SYNOPSIS
-#     Analyzes SharePoint permissions with real-time console updates
-#     #>
-#     try {
-#         Write-ActivityLog "Starting SharePoint permissions analysis" -Level "Information"
-        
-#         # Get site URL if specified
-#         $siteUrl = $script:txtSiteUrl.Text.Trim()
-#         if ([string]::IsNullOrEmpty($siteUrl)) {
-#             $siteUrl = "All Sites (Tenant-wide analysis)"
-#         }
-        
-#         # Clear previous results and show starting message
-#         Write-ConsoleOutput "🔐 SHAREPOINT PERMISSIONS ANALYSIS" -ForceUpdate
-#         Write-ConsoleOutput "=====================================================" -Append -ForceUpdate
-#         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
-#         Write-ConsoleOutput "🎯 Target: $siteUrl" -Append -ForceUpdate
-#         Write-ConsoleOutput "" -Append -ForceUpdate
-        
-#         if (Get-AppSetting -SettingName "DemoMode") {
-#             Get-DemoPermissions-DataDriven -SiteUrl $siteUrl
-#         } else {
-#             Get-RealPermissions-DataDriven -SiteUrl $siteUrl
-#         }
-        
-#         Write-ActivityLog "SharePoint permissions analysis completed" -Level "Information"
-#     }
-#     catch {
-#         Write-ConsoleOutput "❌ ERROR: Failed to analyze SharePoint permissions" -Append
-#         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
-#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-SharePointPermissions"
-#     }
-# }
-
-# function Get-RealPermissions-DataDriven {
-#     <#
-#     .SYNOPSIS
-#     Analyzes real SharePoint permissions and stores in data manager
-#     #>
-#     param([string]$SiteUrl)
-    
-#     try {
-#         if (-not $script:SPOConnected) {
-#             throw "Not connected to SharePoint. Please connect first."
-#         }
-        
-#         # Clear previous data
-#         Clear-SharePointData -DataType "All"
-#         Set-SharePointOperationContext -OperationType "Permissions Analysis"
-        
-#         $siteUrl = $script:txtSiteUrl.Text.Trim()
-#         if ([string]::IsNullOrEmpty($siteUrl)) {
-#             Write-ConsoleOutput "Please enter a specific site URL to analyze permissions." -Append
-#             return
-#         }
-        
-#         Write-ConsoleOutput "🔄 Analyzing permissions for: $siteUrl..." -Append -ForceUpdate
-        
-#         # Connect to the site
-#         Connect-PnPOnline -Url $siteUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive
-        
-#         # Get site information
-#         $web = Get-PnPWeb -ErrorAction Stop
-        
-#         # Add the analyzed site to data store
-#         $siteData = @{
-#             Title = if ($web.Title) { $web.Title } else { "Analyzed Site" }
-#             Url = if ($web.Url) { $web.Url } else { $siteUrl }
-#             Owner = "Current User"
-#             Storage = "850"  # Default value
-#             Template = if ($web.WebTemplate) { $web.WebTemplate } else { "N/A" }
-#             HasUniquePermissions = $web.HasUniqueRoleAssignments
-#         }
-#         Add-SharePointSite -SiteData $siteData
-        
-#         # Display site info
-#         Write-ConsoleOutput "✅ SITE INFORMATION" -Append -ForceUpdate
-#         Write-ConsoleOutput "📝 Title: $($web.Title)" -Append
-#         Write-ConsoleOutput "🌐 URL: $($web.Url)" -Append
-#         Write-ConsoleOutput "🔒 Has Unique Permissions: $($web.HasUniqueRoleAssignments)" -Append
-#         Write-ConsoleOutput "" -Append
-        
-#         # Get and store users
-#         Write-ConsoleOutput "👥 Retrieving users..." -Append -ForceUpdate
-#         try {
-#             $users = Get-PnPUser -ErrorAction Stop
-#             $userCounter = 0
-            
-#             foreach ($user in $users | Where-Object { $_.PrincipalType -eq "User" }) {
-#                 $userData = @{
-#                     Name = if ($user.Title) { $user.Title } else { "Unknown User" }
-#                     Email = if ($user.Email) { $user.Email } else { "N/A" }
-#                     LoginName = $user.LoginName
-#                     Type = if ($user.IsShareByEmailGuestUser -or $user.IsEmailAuthenticationGuestUser) { "External" } else { "Internal" }
-#                     IsSiteAdmin = $user.IsSiteAdmin
-#                     Permission = if ($user.IsSiteAdmin) { "Full Control" } else { "Member" }
-#                 }
-#                 Add-SharePointUser -UserData $userData
-                
-#                 $userCounter++
-#                 if ($userCounter -le 10) {
-#                     Write-ConsoleOutput "👤 USER #$userCounter`: $($userData.Name)" -Append
-#                     if ($userData.Email -ne "N/A") { Write-ConsoleOutput "   📧 Email: $($userData.Email)" -Append }
-#                     if ($userData.Type -eq "External") { Write-ConsoleOutput "   🌐 External User" -Append }
-#                     if ($userData.IsSiteAdmin) { Write-ConsoleOutput "   🔑 Site Administrator" -Append }
-#                     Write-ConsoleOutput "   --------------------------------------------------------" -Append
-#                     Update-UIAndWait -WaitMs 200
-#                 }
-#             }
-            
-#             Write-ConsoleOutput "✅ Retrieved $userCounter users" -Append
-#             Write-ConsoleOutput "" -Append
-#         }
-#         catch {
-#             Write-ConsoleOutput "⚠️ Limited access to user information" -Append
-#             Write-ConsoleOutput "" -Append
-#         }
-        
-#         # Get and store groups
-#         Write-ConsoleOutput "👨‍👩‍👧‍👦 Retrieving groups..." -Append -ForceUpdate
-#         try {
-#             $groups = Get-PnPGroup -ErrorAction Stop
-#             $groupCounter = 0
-            
-#             foreach ($group in $groups) {
-#                 $memberCount = 0
-#                 try {
-#                     $members = Get-PnPGroupMember -Group $group.Title -ErrorAction SilentlyContinue
-#                     if ($members) { $memberCount = $members.Count }
-#                 }
-#                 catch { }
-                
-#                 $groupData = @{
-#                     Name = $group.Title
-#                     Description = if ($group.Description) { $group.Description } else { "N/A" }
-#                     MemberCount = $memberCount
-#                     Permission = "Group Permission"
-#                     Id = $group.Id
-#                 }
-#                 Add-SharePointGroup -GroupData $groupData
-                
-#                 $groupCounter++
-#                 if ($groupCounter -le 10) {
-#                     Write-ConsoleOutput "👥 GROUP #$groupCounter`: $($groupData.Name)" -Append
-#                     if ($groupData.Description -ne "N/A") { Write-ConsoleOutput "   📝 Description: $($groupData.Description)" -Append }
-#                     Write-ConsoleOutput "   👥 Members: $memberCount" -Append
-#                     Write-ConsoleOutput "   ========================================================" -Append
-#                     Update-UIAndWait -WaitMs 250
-#                 }
-#             }
-            
-#             Write-ConsoleOutput "✅ Retrieved $groupCounter groups" -Append
-#             Write-ConsoleOutput "" -Append
-#         }
-#         catch {
-#             Write-ConsoleOutput "❌ Failed to retrieve groups" -Append
-#             Write-ConsoleOutput "" -Append
-#         }
-        
-#         Write-ConsoleOutput "✅ Permissions analysis completed successfully!" -Append -ForceUpdate
-        
-#         # UPDATE VISUAL ANALYTICS DIRECTLY FROM DATA
-#         Update-VisualAnalyticsFromData
-        
-#         Write-ActivityLog "Permissions analysis completed" -Level "Information"
-        
-#     }
-#     catch {
-#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealPermissions-DataDriven"
-#         Write-ConsoleOutput "❌ ERROR: Permissions analysis failed" -Append
-#         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
-#     }
-# }
 
 function Get-RealPermissions-DataDriven {
     <#
@@ -568,54 +273,54 @@ function Get-RealPermissions-DataDriven {
         if (-not $script:SPOConnected) {
             throw "Not connected to SharePoint. Please connect first."
         }
-        
+
         $siteUrl = $script:txtSiteUrl.Text.Trim()
         if ([string]::IsNullOrEmpty($siteUrl)) {
             Write-ConsoleOutput "Please enter a specific site URL to analyze permissions." -Append
             return
         }
-        
+
         # Clear previous data and set context
         Clear-SharePointData -DataType "All"
         Set-SharePointOperationContext -OperationType "Permissions Analysis"
-        
+
         # Clear console and show header
         Write-ConsoleOutput "🔐 SHAREPOINT PERMISSIONS ANALYSIS" -ForceUpdate
         Write-ConsoleOutput "=====================================================" -Append -ForceUpdate
         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
         Write-ConsoleOutput "🎯 Target: $siteUrl" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append -ForceUpdate
-        
+
         Write-ConsoleOutput "🔄 Analyzing permissions for: $siteUrl..." -Append -ForceUpdate
         Write-ConsoleOutput "📡 Connecting to the specified site..." -Append -ForceUpdate
-        
+
         # Connect to the site
         Connect-PnPOnline -Url $siteUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive
         Write-ConsoleOutput "✅ Connected successfully!" -Append -ForceUpdate
-        
+
         # Get site information INCLUDING STORAGE
         Write-ConsoleOutput "📊 Retrieving site information and storage data..." -Append -ForceUpdate
-        
+
         $web = Get-PnPWeb -ErrorAction Stop
-        
+
         # Get REAL storage data
         $storageValue = 0
         $storageQuota = 0
         $storagePercentUsed = 0
-        
+
         try {
             # Get site with Usage information
             $site = Get-PnPSite -Includes Usage -ErrorAction Stop
-            
+
             if ($site.Usage) {
                 # Storage is in bytes, convert to MB
                 $storageValue = [math]::Round($site.Usage.Storage / 1MB, 0)
                 $storageQuota = [math]::Round($site.Usage.StorageQuotaInMB, 0)
-                
+
                 if ($site.Usage.StoragePercentageUsed) {
                     $storagePercentUsed = [math]::Round($site.Usage.StoragePercentageUsed, 2)
                 }
-                
+
                 Write-ActivityLog "Retrieved storage data: $storageValue MB used of $storageQuota MB quota ($storagePercentUsed%)" -Level "Information"
             }
             else {
@@ -624,23 +329,23 @@ function Get-RealPermissions-DataDriven {
         }
         catch {
             Write-ActivityLog "Failed to get storage data: $($_.Exception.Message)" -Level "Warning"
-            
+
             # Try alternative method using tenant admin if available
             try {
                 $tenantUrl = Get-AppSetting -SettingName "SharePoint.TenantUrl"
                 $adminUrl = $tenantUrl -replace "\.sharepoint\.com", "-admin.sharepoint.com"
-                
+
                 Write-ConsoleOutput "⚠️ Attempting to get storage via admin connection..." -Append -ForceUpdate
-                
+
                 Connect-PnPOnline -Url $adminUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive -ErrorAction Stop
                 $tenantSites = Get-PnPTenantSite -Url $siteUrl -Detailed -ErrorAction Stop
-                
+
                 if ($tenantSites -and $tenantSites.StorageUsageCurrent) {
                     $storageValue = [int]$tenantSites.StorageUsageCurrent
                     $storageQuota = if ($tenantSites.StorageQuota) { [int]$tenantSites.StorageQuota } else { 0 }
                     Write-ActivityLog "Retrieved storage from admin: $storageValue MB" -Level "Information"
                 }
-                
+
                 # Reconnect to the original site
                 Connect-PnPOnline -Url $siteUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive
             }
@@ -648,7 +353,7 @@ function Get-RealPermissions-DataDriven {
                 Write-ActivityLog "Admin storage retrieval also failed: $($_.Exception.Message)" -Level "Warning"
             }
         }
-        
+
         # Add the analyzed site to data store with REAL storage
         $siteData = @{
             Title = if ($web.Title) { $web.Title } else { "Analyzed Site" }
@@ -662,7 +367,7 @@ function Get-RealPermissions-DataDriven {
             LastModified = if ($web.LastItemModifiedDate) { $web.LastItemModifiedDate.ToString("yyyy-MM-dd") } else { "N/A" }
         }
         Add-SharePointSite -SiteData $siteData
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ SITE INFORMATION" -Append -ForceUpdate
         Write-ConsoleOutput "📝 Title: $($web.Title)" -Append
@@ -676,18 +381,18 @@ function Get-RealPermissions-DataDriven {
         Write-ConsoleOutput "📅 Last Modified: $($siteData.LastModified)" -Append
         Write-ConsoleOutput "🔒 Has Unique Permissions: $($web.HasUniqueRoleAssignments)" -Append
         Write-ConsoleOutput "" -Append
-        
+
         # Get and store users
         Write-ConsoleOutput "👥 Retrieving users..." -Append -ForceUpdate
         try {
             $users = Get-PnPUser -ErrorAction Stop
             $userCounter = 0
-            $regularUsers = $users | Where-Object { 
-                $_.PrincipalType -eq "User" -and 
-                -not $_.LoginName.Contains("app@sharepoint") -and 
+            $regularUsers = $users | Where-Object {
+                $_.PrincipalType -eq "User" -and
+                -not $_.LoginName.Contains("app@sharepoint") -and
                 -not $_.LoginName.Contains("SHAREPOINT\system")
             }
-            
+
             foreach ($user in $regularUsers) {
                 $userData = @{
                     Name = if ($user.Title) { $user.Title } else { "Unknown User" }
@@ -698,7 +403,7 @@ function Get-RealPermissions-DataDriven {
                     Permission = if ($user.IsSiteAdmin) { "Full Control" } else { "Member" }
                 }
                 Add-SharePointUser -UserData $userData
-                
+
                 $userCounter++
                 if ($userCounter -le 10) {
                     Write-ConsoleOutput "👤 USER #$userCounter`: $($userData.Name)" -Append
@@ -709,11 +414,11 @@ function Get-RealPermissions-DataDriven {
                     Update-UIAndWait -WaitMs 200
                 }
             }
-            
+
             if ($regularUsers.Count -gt 10) {
                 Write-ConsoleOutput "   ... and $($regularUsers.Count - 10) more users" -Append
             }
-            
+
             Write-ConsoleOutput "" -Append
             Write-ConsoleOutput "✅ Retrieved $($regularUsers.Count) users" -Append
             Write-ConsoleOutput "" -Append
@@ -722,18 +427,18 @@ function Get-RealPermissions-DataDriven {
             Write-ConsoleOutput "⚠️ Limited access to user information" -Append
             Write-ConsoleOutput "" -Append
         }
-        
+
         # Get and store groups
         Write-ConsoleOutput "👨‍👩‍👧‍👦 Retrieving groups..." -Append -ForceUpdate
         try {
             $groups = Get-PnPGroup -ErrorAction Stop
             $groupCounter = 0
-            
+
             $importantGroups = $groups | Where-Object {
-                -not $_.Title.StartsWith("SharingLinks") -and 
+                -not $_.Title.StartsWith("SharingLinks") -and
                 -not $_.Title.StartsWith("Limited Access")
             }
-            
+
             foreach ($group in $importantGroups) {
                 $memberCount = 0
                 try {
@@ -741,7 +446,7 @@ function Get-RealPermissions-DataDriven {
                     if ($members) { $memberCount = $members.Count }
                 }
                 catch { }
-                
+
                 $groupData = @{
                     Name = $group.Title
                     Description = if ($group.Description) { $group.Description } else { "N/A" }
@@ -750,7 +455,7 @@ function Get-RealPermissions-DataDriven {
                     Id = $group.Id
                 }
                 Add-SharePointGroup -GroupData $groupData
-                
+
                 $groupCounter++
                 if ($groupCounter -le 10) {
                     Write-ConsoleOutput "👥 GROUP #$groupCounter`: $($groupData.Name)" -Append
@@ -760,11 +465,11 @@ function Get-RealPermissions-DataDriven {
                     Update-UIAndWait -WaitMs 250
                 }
             }
-            
+
             if ($importantGroups.Count -gt 10) {
                 Write-ConsoleOutput "   ... and $($importantGroups.Count - 10) more groups" -Append
             }
-            
+
             Write-ConsoleOutput "" -Append
             Write-ConsoleOutput "✅ Retrieved $($importantGroups.Count) groups" -Append
             Write-ConsoleOutput "" -Append
@@ -773,7 +478,7 @@ function Get-RealPermissions-DataDriven {
             Write-ConsoleOutput "❌ Failed to retrieve groups: $($_.Exception.Message)" -Append
             Write-ConsoleOutput "" -Append
         }
-        
+
         # Show storage notice if we couldn't get it
         if ($storageValue -eq 0) {
             Write-ConsoleOutput "⚠️ Note: Storage data unavailable. This requires:" -Append
@@ -781,16 +486,16 @@ function Get-RealPermissions-DataDriven {
             Write-ConsoleOutput "   • Sites.FullControl.All API permission" -Append
             Write-ConsoleOutput "" -Append
         }
-        
+
         Write-ConsoleOutput "=" * 65 -Append
         Write-ConsoleOutput "✅ PERMISSIONS ANALYSIS COMPLETED SUCCESSFULLY" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append
-        
+
         # UPDATE VISUAL ANALYTICS DIRECTLY FROM DATA
         Update-VisualAnalyticsFromData
-        
+
         Write-ActivityLog "Permissions analysis completed with storage: $storageValue MB" -Level "Information"
-        
+
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealPermissions-DataDriven"
@@ -808,10 +513,10 @@ function Get-DemoSites-DataDriven {
         # Clear and set context
         Clear-SharePointData -DataType "All"
         Set-SharePointOperationContext -OperationType "Sites Analysis (Demo)"
-        
+
         Write-ConsoleOutput "🎭 Running in Demo Mode - Simulating site collection enumeration..." -Append -ForceUpdate
         Update-UIAndWait -WaitMs 500
-        
+
         # Define demo sites
         $demoSites = @(
             @{Title="Team Collaboration Site"; Url="https://demo.sharepoint.com/sites/teamsite"; Owner="admin@demo.com"; Storage="245"},
@@ -820,16 +525,16 @@ function Get-DemoSites-DataDriven {
             @{Title="Company Intranet Portal"; Url="https://demo.sharepoint.com"; Owner="admin@demo.com"; Storage="2048"},
             @{Title="Sales Team Hub"; Url="https://demo.sharepoint.com/sites/sales"; Owner="sales.manager@demo.com"; Storage="768"}
         )
-        
+
         Write-ConsoleOutput "🏢 Sites Found: $($demoSites.Count)" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append
-        
+
         # Add each site to data store
         $siteCounter = 0
         foreach ($site in $demoSites) {
             $siteCounter++
             Add-SharePointSite -SiteData $site
-            
+
             Write-ConsoleOutput "📁 SITE #$siteCounter`: $($site.Title)" -Append -ForceUpdate
             Write-ConsoleOutput "   🌐 URL: $($site.Url)" -Append
             Write-ConsoleOutput "   👤 Owner: $($site.Owner)" -Append
@@ -837,80 +542,17 @@ function Get-DemoSites-DataDriven {
             Write-ConsoleOutput "   ============================================================" -Append
             Update-UIAndWait -WaitMs 400
         }
-        
+
         Write-ConsoleOutput "✅ Site enumeration completed successfully!" -Append -ForceUpdate
-        
+
         # Update Visual Analytics directly from data
         Update-VisualAnalyticsFromData
-        
+
     }
     catch {
         Write-ConsoleOutput "❌ Demo sites retrieval failed: $($_.Exception.Message)" -Append
     }
 }
-
-# function Get-DemoPermissions-DataDriven {
-#     <#
-#     .SYNOPSIS
-#     Demo permissions using data-driven approach
-#     #>
-#     try {
-#         # Clear and set context
-#         Clear-SharePointData -DataType "All"
-#         Set-SharePointOperationContext -OperationType "Permissions Analysis (Demo)"
-        
-#         Write-ConsoleOutput "🎭 Running in Demo Mode - Simulating permissions analysis..." -Append -ForceUpdate
-#         Update-UIAndWait -WaitMs 500
-        
-#         # Add demo site
-#         Add-SharePointSite -SiteData @{
-#             Title = "Team Collaboration Site"
-#             Url = "https://demo.sharepoint.com/sites/teamsite"
-#             Owner = "admin@demo.com"
-#             Storage = "750"
-#         }
-        
-#         # Add demo users
-#         $demoUsers = @(
-#             @{Name="John Doe"; Email="john.doe@demo.com"; Type="Internal"; Permission="Full Control"},
-#             @{Name="Jane Smith"; Email="jane.smith@demo.com"; Type="Internal"; Permission="Edit"},
-#             @{Name="Mike Johnson"; Email="mike.johnson@demo.com"; Type="Internal"; Permission="Read"},
-#             @{Name="External Partner"; Email="partner@external.com"; Type="External"; Permission="Read"}
-#         )
-        
-#         foreach ($user in $demoUsers) {
-#             Add-SharePointUser -UserData $user
-#         }
-        
-#         # Add demo groups
-#         $demoGroups = @(
-#             @{Name="Site Owners"; MemberCount=3; Permission="Full Control"},
-#             @{Name="Site Members"; MemberCount=8; Permission="Edit"},
-#             @{Name="Site Visitors"; MemberCount=4; Permission="Read"}
-#         )
-        
-#         foreach ($group in $demoGroups) {
-#             Add-SharePointGroup -GroupData $group
-#         }
-        
-#         # Display summary
-#         $metrics = Get-SharePointData -DataType "Metrics"
-#         Write-ConsoleOutput "" -Append
-#         Write-ConsoleOutput "📊 PERMISSION SUMMARY:" -Append -ForceUpdate
-#         Write-ConsoleOutput "   👤 Total Users: $($metrics.TotalUsers)" -Append
-#         Write-ConsoleOutput "   👨‍👩‍👧‍👦 Total Groups: $($metrics.TotalGroups)" -Append
-#         Write-ConsoleOutput "   🌐 External Users: $($metrics.ExternalUsers)" -Append
-#         Write-ConsoleOutput "" -Append
-#         Write-ConsoleOutput "✅ Permissions analysis completed successfully!" -Append -ForceUpdate
-        
-#         # Update Visual Analytics directly from data
-#         Update-VisualAnalyticsFromData
-        
-#     }
-#     catch {
-#         Write-ConsoleOutput "❌ Demo permissions analysis failed: $($_.Exception.Message)" -Append
-#     }
-# }
 
 function Get-DemoPermissions-DataDriven {
     <#
@@ -921,25 +563,25 @@ function Get-DemoPermissions-DataDriven {
         # Clear and set context
         Clear-SharePointData -DataType "All"
         Set-SharePointOperationContext -OperationType "Permissions Analysis (Demo)"
-        
+
         $siteUrl = $script:txtSiteUrl.Text.Trim()
         if ([string]::IsNullOrEmpty($siteUrl)) {
             $siteUrl = "https://demo.sharepoint.com/sites/teamsite"
         }
-        
+
         # Clear console and show header
         Write-ConsoleOutput "🔐 SHAREPOINT PERMISSIONS ANALYSIS" -ForceUpdate
         Write-ConsoleOutput "=====================================================" -Append -ForceUpdate
         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
         Write-ConsoleOutput "🎯 Target: $siteUrl" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append -ForceUpdate
-        
+
         Write-ConsoleOutput "🎭 Running in Demo Mode - Simulating permissions analysis..." -Append -ForceUpdate
         Update-UIAndWait -WaitMs 500
-        
+
         # Add demo site with REALISTIC storage value
         $randomStorage = Get-Random -Minimum 200 -Maximum 3000  # Random realistic storage
-        
+
         Add-SharePointSite -SiteData @{
             Title = "Team Collaboration Site"
             Url = $siteUrl
@@ -951,9 +593,9 @@ function Get-DemoPermissions-DataDriven {
             Created = (Get-Date).AddMonths(-6).ToString("yyyy-MM-dd")
             LastModified = (Get-Date).AddDays(-2).ToString("yyyy-MM-dd")
         }
-        
+
         $storagePercent = [math]::Round(($randomStorage / 5120) * 100, 2)
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ SITE INFORMATION" -Append -ForceUpdate
         Write-ConsoleOutput "📝 Title: Team Collaboration Site" -Append
@@ -965,8 +607,7 @@ function Get-DemoPermissions-DataDriven {
         Write-ConsoleOutput "📅 Last Modified: $((Get-Date).AddDays(-2).ToString('yyyy-MM-dd'))" -Append
         Write-ConsoleOutput "🔒 Has Unique Permissions: True" -Append
         Write-ConsoleOutput "" -Append
-        
-        # Rest of the demo code remains the same...
+
         # Add demo users
         $demoUsers = @(
             @{Name="John Doe"; Email="john.doe@demo.com"; Type="Internal"; Permission="Full Control"; IsSiteAdmin=$true},
@@ -974,13 +615,13 @@ function Get-DemoPermissions-DataDriven {
             @{Name="Mike Johnson"; Email="mike.johnson@demo.com"; Type="Internal"; Permission="Read"; IsSiteAdmin=$false},
             @{Name="External Partner"; Email="partner@external.com"; Type="External"; Permission="Read"; IsSiteAdmin=$false}
         )
-        
+
         Write-ConsoleOutput "👤 DETAILED USER PERMISSIONS:" -Append -ForceUpdate
         $userCounter = 0
         foreach ($user in $demoUsers) {
             Add-SharePointUser -UserData $user
             $userCounter++
-            
+
             $typeIcon = if ($user.Type -eq "External") { "🌐" } else { "🏢" }
             Write-ConsoleOutput "   $typeIcon USER #$userCounter`: $($user.Name)" -Append
             Write-ConsoleOutput "      📧 Email: $($user.Email)" -Append
@@ -989,22 +630,22 @@ function Get-DemoPermissions-DataDriven {
             Write-ConsoleOutput "   --------------------------------------------------------" -Append
             Update-UIAndWait -WaitMs 200
         }
-        
+
         Write-ConsoleOutput "" -Append
-        
+
         # Add demo groups
         $demoGroups = @(
             @{Name="Site Owners"; MemberCount=3; Permission="Full Control"; Description="Site administrators"},
             @{Name="Site Members"; MemberCount=8; Permission="Edit"; Description="Regular contributors"},
             @{Name="Site Visitors"; MemberCount=4; Permission="Read"; Description="Read-only access"}
         )
-        
+
         Write-ConsoleOutput "👨‍👩‍👧‍👦 SHAREPOINT GROUPS:" -Append -ForceUpdate
         $groupCounter = 0
         foreach ($group in $demoGroups) {
             Add-SharePointGroup -GroupData $group
             $groupCounter++
-            
+
             Write-ConsoleOutput "   👥 GROUP #$groupCounter`: $($group.Name)" -Append
             Write-ConsoleOutput "      📝 Description: $($group.Description)" -Append
             Write-ConsoleOutput "      👥 Members: $($group.MemberCount)" -Append
@@ -1012,7 +653,7 @@ function Get-DemoPermissions-DataDriven {
             Write-ConsoleOutput "   ========================================================" -Append
             Update-UIAndWait -WaitMs 200
         }
-        
+
         # Display summary
         $metrics = Get-SharePointData -DataType "Metrics"
         Write-ConsoleOutput "" -Append
@@ -1022,10 +663,10 @@ function Get-DemoPermissions-DataDriven {
         Write-ConsoleOutput "   🌐 External Users: $($metrics.ExternalUsers)" -Append
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ Permissions analysis completed successfully!" -Append -ForceUpdate
-        
+
         # Update Visual Analytics directly from data
         Update-VisualAnalyticsFromData
-        
+
     }
     catch {
         Write-ConsoleOutput "❌ Demo permissions analysis failed: $($_.Exception.Message)" -Append
@@ -1040,19 +681,19 @@ function Generate-SharePointReport {
     #>
     try {
         Write-ActivityLog "Starting SharePoint report generation" -Level "Information"
-        
+
         # Clear previous results and show starting message
         Write-ConsoleOutput "📈 SHAREPOINT PERMISSIONS REPORT GENERATION" -ForceUpdate
         Write-ConsoleOutput "=======================================================" -Append -ForceUpdate
         Write-ConsoleOutput "⏱️ Started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Append -ForceUpdate
         Write-ConsoleOutput "" -Append -ForceUpdate
-        
+
         if (Get-AppSetting -SettingName "DemoMode") {
             Generate-DemoReport
         } else {
             Generate-RealReport
         }
-        
+
         Write-ActivityLog "SharePoint report generation completed" -Level "Information"
     }
     catch {
@@ -1070,10 +711,10 @@ function Generate-DemoReport {
     try {
         # Initialize progress tracking
         $script:ReportStartTime = Get-Date
-        
+
         Write-ConsoleOutput "🎭 Running in Demo Mode - Simulating comprehensive report generation..." -Append -ForceUpdate
         Write-ConsoleOutput "" -Append
-        
+
         # Step-by-step progress
         Show-ReportProgress "Initializing Report Environment" "Creating output directories and validating settings" 600
         Show-ReportProgress "Gathering Site Collections" "Enumerating all SharePoint sites in tenant" 1200
@@ -1083,23 +724,23 @@ function Generate-DemoReport {
         Show-ReportProgress "Generating CSV Files" "Creating detailed permission matrices" 800
         Show-ReportProgress "Creating Excel Workbook" "Formatting data with charts and pivot tables" 600
         Show-ReportProgress "Finalizing Reports" "Adding executive summary and recommendations" 400
-        
+
         # Generate results
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $totalTime = [math]::Round(((Get-Date) - $script:ReportStartTime).TotalSeconds, 1)
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ REPORT GENERATION COMPLETED!" -Append -ForceUpdate
         Write-ConsoleOutput "========================================" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📁 GENERATED FILES:" -Append -ForceUpdate
         Write-ConsoleOutput "   📊 SharePoint_Permissions_Report_$timestamp.csv" -Append
         Write-ConsoleOutput "   📈 SharePoint_Analysis_Dashboard_$timestamp.xlsx" -Append
         Write-ConsoleOutput "   📋 Executive_Summary_$timestamp.pdf" -Append
         Write-ConsoleOutput "   📝 Detailed_Audit_Log_$timestamp.txt" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📊 REPORT STATISTICS:" -Append -ForceUpdate
         Write-ConsoleOutput "   ⏱️ Processing Time: $totalTime seconds" -Append
         Write-ConsoleOutput "   🏢 Sites Analyzed: 5" -Append
@@ -1108,7 +749,7 @@ function Generate-DemoReport {
         Write-ConsoleOutput "   📋 Permission Records: 1,247" -Append
         Write-ConsoleOutput "   🔍 Security Findings: 8" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "🎯 KEY FINDINGS:" -Append -ForceUpdate
         Write-ConsoleOutput "   ⚠️ 8 External users detected (review required)" -Append
         Write-ConsoleOutput "   🔴 3 Sites with excessive storage usage" -Append
@@ -1116,7 +757,7 @@ function Generate-DemoReport {
         Write-ConsoleOutput "   ✅ All sites comply with base governance policies" -Append
         Write-ConsoleOutput "   🔍 5 Permission inheritance breaks detected" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📋 NEXT STEPS:" -Append -ForceUpdate
         Write-ConsoleOutput "   1. Review generated CSV files for detailed analysis" -Append
         Write-ConsoleOutput "   2. Open Excel dashboard for visual insights" -Append
@@ -1124,12 +765,11 @@ function Generate-DemoReport {
         Write-ConsoleOutput "   4. Schedule regular automated permission audits" -Append
         Write-ConsoleOutput "   5. Implement governance policies for future prevention" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "💡 TIP: Check the Visual Analytics tab for an interactive overview!" -Append -ForceUpdate
-        
-        # Update Visual Analytics
-        $consoleText = $script:txtOperationsResults.Text
-        Parse-ConsoleOutputAndUpdateAnalytics -ConsoleText $consoleText -OperationType "Report"
+
+        # Update Visual Analytics using the data-driven approach
+        Update-VisualAnalyticsFromData
     }
     catch {
         throw "Demo report generation failed: $($_.Exception.Message)"
@@ -1145,19 +785,19 @@ function Generate-RealReport {
         if (-not $script:SPOConnected) {
             throw "Not connected to SharePoint. Please connect first."
         }
-        
+
         Write-ConsoleOutput "🔄 Preparing real SharePoint report generation..." -Append -ForceUpdate
         Update-UIAndWait -WaitMs 1000
-        
+
         Write-ConsoleOutput "📊 Gathering comprehensive tenant data..." -Append -ForceUpdate
         Update-UIAndWait -WaitMs 1500
-        
+
         # Initialize progress tracking
         $script:ReportStartTime = Get-Date
-        
+
         # Step 1: Gather Sites Data
         Show-ReportProgress "Gathering Site Collections" "Enumerating all accessible SharePoint sites" 1000
-        
+
         $allSites = @()
         try {
             # Try to get tenant sites first
@@ -1178,24 +818,24 @@ function Generate-RealReport {
             Write-ConsoleOutput "   ❌ Failed to gather sites data: $($_.Exception.Message)" -Append
             throw "Cannot generate report without site data"
         }
-        
+
         # Step 2: Analyze Permissions for Each Site
         Show-ReportProgress "Analyzing Site Permissions" "Processing permissions for each site" 2000
-        
+
         $allPermissions = @()
         $siteCounter = 0
         foreach ($site in $allSites | Select-Object -First 10) { # Limit for performance
             $siteCounter++
             try {
                 Write-ConsoleOutput "   🔍 Analyzing site $siteCounter/$($allSites.Count): $($site.Title)" -Append
-                
+
                 # Connect to each site
                 Connect-PnPOnline -Url $site.Url -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive -ErrorAction SilentlyContinue
-                
+
                 # Get users and groups for this site
                 $users = Get-PnPUser -ErrorAction SilentlyContinue
                 $groups = Get-PnPGroup -ErrorAction SilentlyContinue
-                
+
                 # Process users
                 foreach ($user in $users | Where-Object { $_.PrincipalType -eq "User" }) {
                     $allPermissions += [PSCustomObject]@{
@@ -1210,7 +850,7 @@ function Generate-RealReport {
                         LastModified = Get-Date
                     }
                 }
-                
+
                 # Process groups
                 foreach ($group in $groups) {
                     $allPermissions += [PSCustomObject]@{
@@ -1225,20 +865,20 @@ function Generate-RealReport {
                         LastModified = Get-Date
                     }
                 }
-                
+
                 Update-UIAndWait -WaitMs 200
             }
             catch {
                 Write-ConsoleOutput "   ⚠️ Skipped site due to access issues: $($site.Title)" -Append
             }
         }
-        
+
         # Step 3: Generate CSV Report
         Show-ReportProgress "Generating CSV Export" "Creating detailed permission matrices" 800
-        
+
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $csvPath = "SharePoint_Permissions_Report_$timestamp.csv"
-        
+
         try {
             $allPermissions | Export-Csv -Path $csvPath -NoTypeInformation -ErrorAction Stop
             Write-ConsoleOutput "   ✅ CSV report saved: $csvPath" -Append
@@ -1246,29 +886,29 @@ function Generate-RealReport {
         catch {
             Write-ConsoleOutput "   ❌ Failed to save CSV: $($_.Exception.Message)" -Append
         }
-        
+
         # Step 4: Generate Summary Statistics
         Show-ReportProgress "Generating Summary Statistics" "Calculating security metrics and insights" 600
-        
+
         $totalUsers = ($allPermissions | Where-Object { $_.PrincipalType -eq "User" }).Count
         $totalGroups = ($allPermissions | Where-Object { $_.PrincipalType -eq "Group" }).Count
         $externalUsers = ($allPermissions | Where-Object { $_.IsExternal -eq $true }).Count
         $siteAdmins = ($allPermissions | Where-Object { $_.IsSiteAdmin -eq $true }).Count
-        
+
         # Step 5: Create Executive Summary
         Show-ReportProgress "Creating Executive Summary" "Compiling findings and recommendations" 400
-        
+
         $totalTime = [math]::Round(((Get-Date) - $script:ReportStartTime).TotalSeconds, 1)
-        
+
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ REAL SHAREPOINT REPORT COMPLETED!" -Append -ForceUpdate
         Write-ConsoleOutput "========================================" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📁 GENERATED FILES:" -Append -ForceUpdate
         Write-ConsoleOutput "   📊 $csvPath" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📊 REPORT STATISTICS:" -Append -ForceUpdate
         Write-ConsoleOutput "   ⏱️ Processing Time: $totalTime seconds" -Append
         Write-ConsoleOutput "   🏢 Sites Analyzed: $siteCounter" -Append
@@ -1278,7 +918,7 @@ function Generate-RealReport {
         Write-ConsoleOutput "   🌐 External Users: $externalUsers" -Append
         Write-ConsoleOutput "   🔑 Site Administrators: $siteAdmins" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "🎯 KEY FINDINGS:" -Append -ForceUpdate
         if ($externalUsers -gt 0) {
             Write-ConsoleOutput "   ⚠️ $externalUsers External users detected (review required)" -Append
@@ -1288,7 +928,7 @@ function Generate-RealReport {
         }
         Write-ConsoleOutput "   ✅ Permissions data successfully exported for detailed analysis" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "📋 NEXT STEPS:" -Append -ForceUpdate
         Write-ConsoleOutput "   1. Open the generated CSV file for detailed analysis" -Append
         Write-ConsoleOutput "   2. Review external user access and justifications" -Append
@@ -1296,13 +936,12 @@ function Generate-RealReport {
         Write-ConsoleOutput "   4. Consider implementing automated monitoring" -Append
         Write-ConsoleOutput "   5. Schedule regular permission reviews" -Append
         Write-ConsoleOutput "" -Append
-        
+
         Write-ConsoleOutput "💡 CSV file contains complete permission data for further analysis in Excel or Power BI!" -Append -ForceUpdate
-        
-        # Update Visual Analytics
-        $consoleText = $script:txtOperationsResults.Text
-        Parse-ConsoleOutputAndUpdateAnalytics -ConsoleText $consoleText -OperationType "Report"
-        
+
+        # Update Visual Analytics using the data-driven approach
+        Update-VisualAnalyticsFromData
+
     }
     catch {
         Write-ConsoleOutput "❌ Real SharePoint report generation failed!" -Append
@@ -1327,17 +966,17 @@ function Show-ReportProgress {
         [string]$Details,
         [int]$DelayMs = 500
     )
-    
+
     try {
         $timeStamp = Get-Date -Format "HH:mm:ss"
-        
+
         Write-ConsoleOutput "[$timeStamp] 🔄 $StepName" -Append -ForceUpdate
         if ($Details) {
             Write-ConsoleOutput "           └─ $Details" -Append
         }
-        
+
         Update-UIAndWait -WaitMs $DelayMs
-        
+
         Write-ConsoleOutput "[$timeStamp] ✅ $StepName - Complete" -Append
         Write-ConsoleOutput "" -Append
     }
@@ -1349,11 +988,11 @@ function Show-ReportProgress {
 # Helper function for UI updates and waiting
 function Update-UIAndWait {
     param([int]$WaitMs = 500)
-    
+
     try {
         # Force UI update
         [System.Windows.Forms.Application]::DoEvents()
-        
+
         # Wait for specified time
         Start-Sleep -Milliseconds $WaitMs
     }
@@ -1370,19 +1009,19 @@ function Write-ConsoleOutput {
         [switch]$Append,
         [switch]$ForceUpdate
     )
-    
+
     try {
         if ($Append) {
             $script:txtOperationsResults.Text += "`n$Message"
         } else {
             $script:txtOperationsResults.Text = $Message
         }
-        
+
         if ($ForceUpdate) {
             # Scroll to bottom
             $script:txtOperationsResults.SelectionStart = $script:txtOperationsResults.Text.Length
             $script:txtOperationsResults.ScrollToCaret()
-            
+
             # Force UI refresh
             [System.Windows.Forms.Application]::DoEvents()
         }
