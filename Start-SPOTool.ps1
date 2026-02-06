@@ -26,6 +26,9 @@ Add-Type -AssemblyName System.Windows.Forms
 . "$PSScriptRoot\Functions\UI\DeepDive\UsersDeepDive.ps1"
 . "$PSScriptRoot\Functions\UI\DeepDive\GroupsDeepDive.ps1"
 . "$PSScriptRoot\Functions\UI\DeepDive\ExternalUsersDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\PermissionsDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\InheritanceDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\SharingLinksDeepDive.ps1"
 
 # Global variables
 $script:SPOConnected = $false

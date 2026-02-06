@@ -479,6 +479,185 @@ function Get-RealPermissions-DataDriven {
             Write-ConsoleOutput "" -Append
         }
 
+        # ===== ROLE ASSIGNMENT MAPPING =====
+        Write-ConsoleOutput "🔑 Analyzing role assignments..." -Append -ForceUpdate
+        try {
+            $web = Get-PnPWeb -ErrorAction Stop
+            $roleAssignments = Get-PnPProperty -ClientObject $web -Property RoleAssignments -ErrorAction Stop
+            $raCounter = 0
+
+            foreach ($ra in $roleAssignments) {
+                try {
+                    $member = Get-PnPProperty -ClientObject $ra -Property Member -ErrorAction SilentlyContinue
+                    $roleBindings = Get-PnPProperty -ClientObject $ra -Property RoleDefinitionBindings -ErrorAction SilentlyContinue
+
+                    if ($member -and $roleBindings) {
+                        foreach ($roleDef in $roleBindings) {
+                            if ($roleDef.Name -eq "Limited Access") { continue }
+
+                            $principalType = switch ($member.PrincipalType) {
+                                "User" { "User" }
+                                "SharePointGroup" { "SharePoint Group" }
+                                "SecurityGroup" { "Security Group" }
+                                default { $member.PrincipalType.ToString() }
+                            }
+
+                            $roleData = @{
+                                Principal = $member.Title
+                                PrincipalType = $principalType
+                                Role = $roleDef.Name
+                                Scope = "Site"
+                                ScopeUrl = $siteUrl
+                                SiteTitle = $web.Title
+                            }
+                            Add-SharePointRoleAssignment -RoleData $roleData
+                            $raCounter++
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            Write-ConsoleOutput "✅ Found $raCounter site-level role assignments" -Append -ForceUpdate
+            Write-ConsoleOutput "" -Append
+        }
+        catch {
+            Write-ConsoleOutput "⚠️ Limited access to role assignment data: $($_.Exception.Message)" -Append
+            Write-ConsoleOutput "" -Append
+        }
+
+        # ===== PERMISSION INHERITANCE TREE =====
+        Write-ConsoleOutput "🔗 Checking permission inheritance..." -Append -ForceUpdate
+        try {
+            # Add site-level entry
+            Add-SharePointInheritanceItem -InheritanceData @{
+                Title = $web.Title
+                Type = "Site"
+                Url = $web.Url
+                HasUniquePermissions = $web.HasUniqueRoleAssignments
+                ParentUrl = "N/A"
+                RoleAssignmentCount = $raCounter
+                SiteTitle = $web.Title
+            }
+
+            $lists = Get-PnPList -ErrorAction Stop
+            $visibleLists = $lists | Where-Object { -not $_.Hidden }
+            $brokenCount = 0
+
+            foreach ($list in $visibleLists) {
+                $listType = if ($list.BaseType -eq "DocumentLibrary") { "Document Library" } else { "List" }
+
+                $listRaCount = 0
+                if ($list.HasUniqueRoleAssignments) {
+                    $brokenCount++
+                    try {
+                        $listRAs = Get-PnPProperty -ClientObject $list -Property RoleAssignments -ErrorAction SilentlyContinue
+                        if ($listRAs) { $listRaCount = $listRAs.Count }
+
+                        # Also capture list-level role assignments
+                        foreach ($listRA in $listRAs) {
+                            try {
+                                $listMember = Get-PnPProperty -ClientObject $listRA -Property Member -ErrorAction SilentlyContinue
+                                $listRoleBindings = Get-PnPProperty -ClientObject $listRA -Property RoleDefinitionBindings -ErrorAction SilentlyContinue
+
+                                if ($listMember -and $listRoleBindings) {
+                                    foreach ($roleDef in $listRoleBindings) {
+                                        if ($roleDef.Name -eq "Limited Access") { continue }
+
+                                        $principalType = switch ($listMember.PrincipalType) {
+                                            "User" { "User" }
+                                            "SharePointGroup" { "SharePoint Group" }
+                                            "SecurityGroup" { "Security Group" }
+                                            default { $listMember.PrincipalType.ToString() }
+                                        }
+
+                                        Add-SharePointRoleAssignment -RoleData @{
+                                            Principal = $listMember.Title
+                                            PrincipalType = $principalType
+                                            Role = $roleDef.Name
+                                            Scope = $listType
+                                            ScopeUrl = $list.RootFolder.ServerRelativeUrl
+                                            SiteTitle = $web.Title
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                }
+
+                Add-SharePointInheritanceItem -InheritanceData @{
+                    Title = $list.Title
+                    Type = $listType
+                    Url = $list.RootFolder.ServerRelativeUrl
+                    HasUniquePermissions = $list.HasUniqueRoleAssignments
+                    ParentUrl = $web.Url
+                    RoleAssignmentCount = $listRaCount
+                    SiteTitle = $web.Title
+                }
+            }
+
+            Write-ConsoleOutput "✅ Scanned $($visibleLists.Count) lists/libraries - $brokenCount with broken inheritance" -Append -ForceUpdate
+            Write-ConsoleOutput "" -Append
+        }
+        catch {
+            Write-ConsoleOutput "⚠️ Limited access to inheritance data: $($_.Exception.Message)" -Append
+            Write-ConsoleOutput "" -Append
+        }
+
+        # ===== SHARING LINKS AUDIT =====
+        Write-ConsoleOutput "🔗 Auditing sharing links..." -Append -ForceUpdate
+        try {
+            $allGroups = Get-PnPGroup -ErrorAction Stop
+            $sharingGroups = $allGroups | Where-Object { $_.Title.StartsWith("SharingLinks") }
+            $linkCounter = 0
+
+            foreach ($sg in $sharingGroups) {
+                # Parse link type from group name
+                $linkType = "Specific People"
+                $accessLevel = "View"
+
+                if ($sg.Title -match "AnonymousView") {
+                    $linkType = "Anonymous"; $accessLevel = "View"
+                } elseif ($sg.Title -match "AnonymousEdit") {
+                    $linkType = "Anonymous"; $accessLevel = "Edit"
+                } elseif ($sg.Title -match "OrganizationView") {
+                    $linkType = "Company-wide"; $accessLevel = "View"
+                } elseif ($sg.Title -match "OrganizationEdit") {
+                    $linkType = "Company-wide"; $accessLevel = "Edit"
+                } elseif ($sg.Title -match "Flexible") {
+                    $linkType = "Specific People"; $accessLevel = "Edit"
+                }
+
+                $memberCount = 0
+                try {
+                    $sgMembers = Get-PnPGroupMember -Group $sg.Title -ErrorAction SilentlyContinue
+                    if ($sgMembers) { $memberCount = $sgMembers.Count }
+                }
+                catch { }
+
+                Add-SharePointSharingLink -LinkData @{
+                    GroupName = $sg.Title
+                    LinkType = $linkType
+                    AccessLevel = $accessLevel
+                    MemberCount = $memberCount
+                    SiteTitle = $web.Title
+                    CreatedDate = "N/A"
+                    GroupId = $sg.Id
+                }
+                $linkCounter++
+            }
+
+            Write-ConsoleOutput "✅ Found $linkCounter sharing links" -Append -ForceUpdate
+            Write-ConsoleOutput "" -Append
+        }
+        catch {
+            Write-ConsoleOutput "⚠️ Limited access to sharing links data: $($_.Exception.Message)" -Append
+            Write-ConsoleOutput "" -Append
+        }
+
         # Show storage notice if we couldn't get it
         if ($storageValue -eq 0) {
             Write-ConsoleOutput "⚠️ Note: Storage data unavailable. This requires:" -Append
@@ -487,8 +666,20 @@ function Get-RealPermissions-DataDriven {
             Write-ConsoleOutput "" -Append
         }
 
+        # Show P3 analysis summary
+        $p3Metrics = Get-SharePointData -DataType "Metrics"
+        Write-ConsoleOutput "🔑 CORE ANALYSIS SUMMARY:" -Append -ForceUpdate
+        Write-ConsoleOutput "   • Role Assignments: $($p3Metrics.TotalRoleAssignments)" -Append
+        Write-ConsoleOutput "   • Inheritance Breaks: $($p3Metrics.InheritanceBreaks)" -Append
+        Write-ConsoleOutput "   • Sharing Links: $($p3Metrics.TotalSharingLinks)" -Append
+        Write-ConsoleOutput "" -Append
+
         Write-ConsoleOutput "=" * 65 -Append
         Write-ConsoleOutput "✅ PERMISSIONS ANALYSIS COMPLETED SUCCESSFULLY" -Append -ForceUpdate
+        Write-ConsoleOutput "" -Append
+
+        Write-ConsoleOutput "💡 TIP: Click metric tiles on Visual Analytics tab for deep dive analysis" -Append -ForceUpdate
+        Write-ConsoleOutput "   New: Role Assignments, Inheritance Tree, and Sharing Links deep dives!" -Append
         Write-ConsoleOutput "" -Append
 
         # UPDATE VISUAL ANALYTICS DIRECTLY FROM DATA
@@ -654,6 +845,78 @@ function Get-DemoPermissions-DataDriven {
             Update-UIAndWait -WaitMs 200
         }
 
+        # Add demo role assignments
+        Write-ConsoleOutput "" -Append
+        Write-ConsoleOutput "🔑 Analyzing role assignments..." -Append -ForceUpdate
+        Update-UIAndWait -WaitMs 300
+
+        $demoRoleAssignments = @(
+            @{Principal="John Doe"; PrincipalType="User"; Role="Full Control"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Jane Smith"; PrincipalType="User"; Role="Edit"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Mike Johnson"; PrincipalType="User"; Role="Read"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="External Partner"; PrincipalType="User"; Role="Read"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Site Owners"; PrincipalType="SharePoint Group"; Role="Full Control"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Site Members"; PrincipalType="SharePoint Group"; Role="Edit"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Site Visitors"; PrincipalType="SharePoint Group"; Role="Read"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="HR Team"; PrincipalType="Security Group"; Role="Contribute"; Scope="Library"; ScopeUrl="/sites/teamsite/Shared Documents"; SiteTitle="Team Collaboration Site"},
+            @{Principal="Finance Group"; PrincipalType="Security Group"; Role="Read"; Scope="List"; ScopeUrl="/sites/teamsite/Lists/Budget"; SiteTitle="Team Collaboration Site"},
+            @{Principal="IT Admins"; PrincipalType="Security Group"; Role="Full Control"; Scope="Site"; ScopeUrl=$siteUrl; SiteTitle="Team Collaboration Site"},
+            @{Principal="Marketing Team"; PrincipalType="Security Group"; Role="Edit"; Scope="Library"; ScopeUrl="/sites/teamsite/Marketing Assets"; SiteTitle="Team Collaboration Site"},
+            @{Principal="Contractors"; PrincipalType="SharePoint Group"; Role="View Only"; Scope="Library"; ScopeUrl="/sites/teamsite/Project Files"; SiteTitle="Team Collaboration Site"}
+        )
+
+        foreach ($ra in $demoRoleAssignments) {
+            Add-SharePointRoleAssignment -RoleData $ra
+        }
+
+        Write-ConsoleOutput "✅ Found $($demoRoleAssignments.Count) role assignments" -Append -ForceUpdate
+
+        # Add demo inheritance items
+        Write-ConsoleOutput "" -Append
+        Write-ConsoleOutput "🔗 Checking permission inheritance..." -Append -ForceUpdate
+        Update-UIAndWait -WaitMs 300
+
+        $demoInheritanceItems = @(
+            @{Title="Team Collaboration Site"; Type="Site"; Url=$siteUrl; HasUniquePermissions=$true; ParentUrl="N/A"; RoleAssignmentCount=7; SiteTitle="Team Collaboration Site"},
+            @{Title="Shared Documents"; Type="Document Library"; Url="/sites/teamsite/Shared Documents"; HasUniquePermissions=$true; ParentUrl=$siteUrl; RoleAssignmentCount=4; SiteTitle="Team Collaboration Site"},
+            @{Title="Site Pages"; Type="Document Library"; Url="/sites/teamsite/SitePages"; HasUniquePermissions=$false; ParentUrl=$siteUrl; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"},
+            @{Title="Project Files"; Type="Document Library"; Url="/sites/teamsite/Project Files"; HasUniquePermissions=$true; ParentUrl=$siteUrl; RoleAssignmentCount=5; SiteTitle="Team Collaboration Site"},
+            @{Title="Marketing Assets"; Type="Document Library"; Url="/sites/teamsite/Marketing Assets"; HasUniquePermissions=$true; ParentUrl=$siteUrl; RoleAssignmentCount=3; SiteTitle="Team Collaboration Site"},
+            @{Title="Budget Tracker"; Type="List"; Url="/sites/teamsite/Lists/Budget"; HasUniquePermissions=$true; ParentUrl=$siteUrl; RoleAssignmentCount=2; SiteTitle="Team Collaboration Site"},
+            @{Title="Team Calendar"; Type="List"; Url="/sites/teamsite/Lists/Calendar"; HasUniquePermissions=$false; ParentUrl=$siteUrl; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"},
+            @{Title="Announcements"; Type="List"; Url="/sites/teamsite/Lists/Announcements"; HasUniquePermissions=$false; ParentUrl=$siteUrl; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"},
+            @{Title="Style Library"; Type="Document Library"; Url="/sites/teamsite/Style Library"; HasUniquePermissions=$false; ParentUrl=$siteUrl; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"},
+            @{Title="Form Templates"; Type="Document Library"; Url="/sites/teamsite/FormServerTemplates"; HasUniquePermissions=$false; ParentUrl=$siteUrl; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"}
+        )
+
+        foreach ($item in $demoInheritanceItems) {
+            Add-SharePointInheritanceItem -InheritanceData $item
+        }
+
+        $brokenCount = ($demoInheritanceItems | Where-Object { $_["HasUniquePermissions"] -eq $true }).Count
+        Write-ConsoleOutput "✅ Scanned $($demoInheritanceItems.Count) items - $brokenCount with broken inheritance" -Append -ForceUpdate
+
+        # Add demo sharing links
+        Write-ConsoleOutput "" -Append
+        Write-ConsoleOutput "🔗 Auditing sharing links..." -Append -ForceUpdate
+        Update-UIAndWait -WaitMs 300
+
+        $demoSharingLinks = @(
+            @{GroupName="SharingLinks.abc123.OrganizationView.def456"; LinkType="Company-wide"; AccessLevel="View"; MemberCount=0; SiteTitle="Team Collaboration Site"; CreatedDate="2025-01-15"},
+            @{GroupName="SharingLinks.abc124.OrganizationEdit.ghi789"; LinkType="Company-wide"; AccessLevel="Edit"; MemberCount=0; SiteTitle="Team Collaboration Site"; CreatedDate="2025-02-01"},
+            @{GroupName="SharingLinks.abc125.AnonymousView.jkl012"; LinkType="Anonymous"; AccessLevel="View"; MemberCount=3; SiteTitle="Team Collaboration Site"; CreatedDate="2025-01-20"},
+            @{GroupName="SharingLinks.abc126.Flexible.mno345"; LinkType="Specific People"; AccessLevel="Edit"; MemberCount=5; SiteTitle="Team Collaboration Site"; CreatedDate="2025-02-10"},
+            @{GroupName="SharingLinks.abc127.Flexible.pqr678"; LinkType="Specific People"; AccessLevel="View"; MemberCount=2; SiteTitle="Team Collaboration Site"; CreatedDate="2025-01-25"},
+            @{GroupName="SharingLinks.abc128.AnonymousEdit.stu901"; LinkType="Anonymous"; AccessLevel="Edit"; MemberCount=1; SiteTitle="Team Collaboration Site"; CreatedDate="2025-03-01"},
+            @{GroupName="SharingLinks.abc129.Flexible.vwx234"; LinkType="Specific People"; AccessLevel="Edit"; MemberCount=8; SiteTitle="Team Collaboration Site"; CreatedDate="2025-02-15"}
+        )
+
+        foreach ($link in $demoSharingLinks) {
+            Add-SharePointSharingLink -LinkData $link
+        }
+
+        Write-ConsoleOutput "✅ Found $($demoSharingLinks.Count) sharing links" -Append -ForceUpdate
+
         # Display summary
         $metrics = Get-SharePointData -DataType "Metrics"
         Write-ConsoleOutput "" -Append
@@ -662,7 +925,15 @@ function Get-DemoPermissions-DataDriven {
         Write-ConsoleOutput "   👨‍👩‍👧‍👦 Total Groups: $($metrics.TotalGroups)" -Append
         Write-ConsoleOutput "   🌐 External Users: $($metrics.ExternalUsers)" -Append
         Write-ConsoleOutput "" -Append
+        Write-ConsoleOutput "🔑 CORE ANALYSIS:" -Append -ForceUpdate
+        Write-ConsoleOutput "   • Role Assignments: $($metrics.TotalRoleAssignments)" -Append
+        Write-ConsoleOutput "   • Inheritance Breaks: $($metrics.InheritanceBreaks)" -Append
+        Write-ConsoleOutput "   • Sharing Links: $($metrics.TotalSharingLinks)" -Append
+        Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "✅ Permissions analysis completed successfully!" -Append -ForceUpdate
+        Write-ConsoleOutput "" -Append
+        Write-ConsoleOutput "💡 TIP: Click metric tiles on Visual Analytics tab for deep dive analysis" -Append -ForceUpdate
+        Write-ConsoleOutput "   New: Role Assignments, Inheritance Tree, and Sharing Links deep dives!" -Append
 
         # Update Visual Analytics directly from data
         Update-VisualAnalyticsFromData

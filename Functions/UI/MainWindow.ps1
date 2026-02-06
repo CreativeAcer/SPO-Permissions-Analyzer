@@ -92,6 +92,11 @@ function Initialize-UIControls {
         $script:canvasPermissionChart = $script:MainWindow.FindName("canvasPermissionChart")
         $script:dgSites = $script:MainWindow.FindName("dgSites")
         $script:lstPermissionAlerts = $script:MainWindow.FindName("lstPermissionAlerts")
+
+        # Security Analysis Cards (P3)
+        $script:txtRoleAssignments = $script:MainWindow.FindName("txtRoleAssignments")
+        $script:txtInheritanceBreaks = $script:MainWindow.FindName("txtInheritanceBreaks")
+        $script:txtSharingLinks = $script:MainWindow.FindName("txtSharingLinks")
         
         # Validate critical controls
         $criticalControls = @(

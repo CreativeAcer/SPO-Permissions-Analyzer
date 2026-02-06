@@ -1,0 +1,334 @@
+<!-- Views/DeepDive/InheritanceDeepDive.xaml -->
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Permission Inheritance Analysis" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#0078D4" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="&#x1F517;" FontSize="24" Foreground="White" Margin="0,0,10,0"/>
+                    <StackPanel>
+                        <TextBlock Text="Permission Inheritance Analysis"
+                                  FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Name="txtItemCount" Text="Analyzing 0 items"
+                                  FontSize="12" Foreground="White" Opacity="0.9"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Name="btnRefreshData" Content="&#x1F504; Refresh"
+                           Width="100" Height="30" Margin="0,0,10,0"
+                           Background="#28A745" Foreground="White" FontWeight="SemiBold"/>
+                    <Button Name="btnExport" Content="&#x1F4CA; Export"
+                           Width="100" Height="30"
+                           Background="#17A2B8" Foreground="White" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Summary Stats -->
+        <Border Grid.Row="1" Background="#F8F9FA" BorderBrush="#E9ECEF"
+               BorderThickness="0,0,0,1" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Total Items -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                    <TextBlock Text="Total Items" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtTotalItems" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#495057"/>
+                </StackPanel>
+
+                <!-- Inheriting -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                    <TextBlock Text="Inheriting" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtInheritingCount" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#28A745"/>
+                </StackPanel>
+
+                <!-- Broken Inheritance -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                    <TextBlock Text="Broken Inheritance" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtBrokenCount" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#DC3545"/>
+                </StackPanel>
+
+                <!-- Lists -->
+                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                    <TextBlock Text="Lists" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtListCount" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#007ACC"/>
+                </StackPanel>
+
+                <!-- Libraries -->
+                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                    <TextBlock Text="Libraries" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtLibraryCount" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#6F42C1"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <TabControl Grid.Row="2" Margin="10">
+
+            <!-- Inheritance Tree Tab -->
+            <TabItem Header="&#x1F4CB; Inheritance Tree">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Search and Filter Bar -->
+                    <Border Grid.Row="0" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="10" Margin="0,0,0,10" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Search Box -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
+                                <TextBlock Text="&#x1F50D;" FontSize="14" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBox Name="txtSearch" Width="250" Height="25"
+                                        VerticalContentAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Type Filter -->
+                            <ComboBox Grid.Column="1" Name="cboTypeFilter" Height="25" Margin="0,0,10,0">
+                                <ComboBoxItem Content="All Types" IsSelected="True"/>
+                                <ComboBoxItem Content="Site"/>
+                                <ComboBoxItem Content="List"/>
+                                <ComboBoxItem Content="Document Library"/>
+                            </ComboBox>
+
+                            <!-- Inheritance Filter -->
+                            <ComboBox Grid.Column="2" Name="cboInheritanceFilter" Height="25">
+                                <ComboBoxItem Content="All Items" IsSelected="True"/>
+                                <ComboBoxItem Content="Inheriting"/>
+                                <ComboBoxItem Content="Broken Inheritance"/>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Inheritance Items DataGrid -->
+                    <DataGrid Grid.Row="1" Name="dgInheritanceItems" AutoGenerateColumns="False"
+                             CanUserSortColumns="True" GridLinesVisibility="Horizontal"
+                             AlternatingRowBackground="#F8F9FA" RowHeight="35">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="200"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="120"/>
+                            <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="250"/>
+                            <DataGridTemplateColumn Header="Has Unique Permissions" Width="150">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding HasUniquePermissions}" HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasUniquePermissions}" Value="True">
+                                                            <Setter Property="Text" Value="&#x2713;"/>
+                                                            <Setter Property="Foreground" Value="Green"/>
+                                                            <Setter Property="FontWeight" Value="Bold"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding HasUniquePermissions}" Value="False">
+                                                            <Setter Property="Text" Value=""/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Parent URL" Binding="{Binding ParentUrl}" Width="200"/>
+                            <DataGridTextColumn Header="Role Assignments" Binding="{Binding RoleAssignmentCount}" Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Site Title" Binding="{Binding SiteTitle}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Inheritance Overview Tab -->
+            <TabItem Header="&#x1F4CA; Inheritance Overview">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="250"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Inheritance Chart -->
+                    <Border Grid.Row="0" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="15" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="Inheritance Distribution by Site" FontSize="14"
+                                      FontWeight="Bold" Margin="0,0,0,10"/>
+                            <Canvas Name="canvasInheritanceChart" Height="200" Background="#FAFAFA"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Inheritance Summary -->
+                    <Border Grid.Row="1" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="15" Margin="0,10,0,0" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="Inheritance Summary by Site" FontSize="14"
+                                      FontWeight="Bold" Margin="0,0,0,10"/>
+                            <DataGrid Name="dgInheritanceSummary" Height="200" AutoGenerateColumns="False"
+                                     GridLinesVisibility="None" IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Site Title" Binding="{Binding SiteTitle}" Width="*"/>
+                                    <DataGridTextColumn Header="Total Items" Binding="{Binding TotalItems}" Width="100"/>
+                                    <DataGridTextColumn Header="Inheriting Items" Binding="{Binding InheritingItems}" Width="120"/>
+                                    <DataGridTextColumn Header="Broken Items" Binding="{Binding BrokenItems}" Width="100"/>
+                                    <DataGridTextColumn Header="Break %" Binding="{Binding BreakPercentage}" Width="100"/>
+                                    <DataGridTemplateColumn Header="Visual" Width="150">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ProgressBar Value="{Binding PercentageValue}"
+                                                           Maximum="100" Height="15"
+                                                           Foreground="{Binding BarColor}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Findings Tab -->
+            <TabItem Header="&#x26A0;&#xFE0F; Findings">
+                <ScrollViewer Margin="10">
+                    <StackPanel>
+                        <!-- Findings Summary -->
+                        <Border Background="White" BorderBrush="#E9ECEF"
+                               BorderThickness="1" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Inheritance Findings Summary" FontSize="14"
+                                          FontWeight="Bold" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Healthy Items -->
+                                    <Border Grid.Column="0" Background="#E8F5E9" Padding="10"
+                                           Margin="0,0,5,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x2705;" FontSize="24"/>
+                                            <TextBlock Name="txtHealthyItems" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#2E7D32"/>
+                                            <TextBlock Text="Healthy Items" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Warning Items -->
+                                    <Border Grid.Column="1" Background="#FFF3E0" Padding="10"
+                                           Margin="5,0,5,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x26A0;&#xFE0F;" FontSize="24"/>
+                                            <TextBlock Name="txtWarningItems" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#F57C00"/>
+                                            <TextBlock Text="Need Attention" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Critical Items -->
+                                    <Border Grid.Column="2" Background="#FFEBEE" Padding="10"
+                                           Margin="5,0,0,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x1F6A8;" FontSize="24"/>
+                                            <TextBlock Name="txtCriticalItems" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#C62828"/>
+                                            <TextBlock Text="Critical Issues" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Inheritance Findings List -->
+                        <Border Background="White" BorderBrush="#E9ECEF"
+                               BorderThickness="1" Padding="15" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Inheritance Issues and Recommendations" FontSize="14"
+                                          FontWeight="Bold" Margin="0,0,0,10"/>
+                                <ListBox Name="lstInheritanceFindings" Height="250" BorderThickness="0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="10" Margin="0,2" CornerRadius="5"
+                                                   Background="{Binding SeverityColor}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="30"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Icon}"
+                                                              FontSize="16" VerticalAlignment="Top"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding Site}" FontWeight="Bold"
+                                                                  Foreground="White"/>
+                                                        <TextBlock Text="{Binding Issue}" Foreground="White"
+                                                                  TextWrapping="Wrap" Margin="0,2"/>
+                                                        <TextBlock Text="{Binding Recommendation}"
+                                                                  Foreground="White" Opacity="0.9"
+                                                                  FontStyle="Italic" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#E9ECEF"
+               BorderThickness="0,1,0,0" Padding="10">
+            <Grid>
+                <TextBlock Name="txtStatus" Text="Ready" FontSize="11"
+                          Foreground="#6C757D" HorizontalAlignment="Left"/>
+                <TextBlock Name="txtLastUpdate" Text="Last updated: Never" FontSize="11"
+                          Foreground="#6C757D" HorizontalAlignment="Right"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

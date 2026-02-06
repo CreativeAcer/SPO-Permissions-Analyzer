@@ -165,6 +165,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             
@@ -226,8 +227,53 @@
                                 </Border>
                             </Grid>
                             
+                            <!-- Security Analysis Cards -->
+                            <Grid Grid.Row="1" Margin="0,0,0,20" Name="gridSecurityCards">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Role Assignments Card -->
+                                <Border Grid.Column="0" Background="#F3E5F5" BorderBrush="#7B1FA2"
+                                       BorderThickness="2" Padding="15" Margin="0,0,10,0" CornerRadius="8">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="[KEY]" FontSize="24" HorizontalAlignment="Center" Foreground="#7B1FA2"/>
+                                        <TextBlock Name="txtRoleAssignments" Text="0" FontSize="28" FontWeight="Bold"
+                                                  Foreground="#7B1FA2" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Role Assignments" FontSize="12" FontWeight="SemiBold"
+                                                  Foreground="#7B1FA2" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Inheritance Breaks Card -->
+                                <Border Grid.Column="1" Background="#FFF8E1" BorderBrush="#F57F17"
+                                       BorderThickness="2" Padding="15" Margin="0,0,10,0" CornerRadius="8">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="[LINK]" FontSize="24" HorizontalAlignment="Center" Foreground="#F57F17"/>
+                                        <TextBlock Name="txtInheritanceBreaks" Text="0" FontSize="28" FontWeight="Bold"
+                                                  Foreground="#F57F17" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Inheritance Breaks" FontSize="12" FontWeight="SemiBold"
+                                                  Foreground="#F57F17" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Sharing Links Card -->
+                                <Border Grid.Column="2" Background="#FCE4EC" BorderBrush="#C62828"
+                                       BorderThickness="2" Padding="15" CornerRadius="8">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="[SHARE]" FontSize="24" HorizontalAlignment="Center" Foreground="#C62828"/>
+                                        <TextBlock Name="txtSharingLinks" Text="0" FontSize="28" FontWeight="Bold"
+                                                  Foreground="#C62828" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Sharing Links" FontSize="12" FontWeight="SemiBold"
+                                                  Foreground="#C62828" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
                             <!-- Charts Row -->
-                            <Grid Grid.Row="1" Margin="0,0,0,20" Name="gridCharts">
+                            <Grid Grid.Row="2" Margin="0,0,0,20" Name="gridCharts">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -255,7 +301,7 @@
                             </Grid>
                             
                             <!-- Sites List with Visual Indicators -->
-                            <Border Grid.Row="2" Background="White" BorderBrush="#E9ECEF" 
+                            <Border Grid.Row="3" Background="White" BorderBrush="#E9ECEF" 
                                    BorderThickness="1" Padding="15" Margin="0,0,0,20" CornerRadius="8">
                                 <StackPanel>
                                     <TextBlock Text="Sites Overview" FontSize="14" FontWeight="Bold" 
@@ -286,7 +332,7 @@
                             </Border>
                             
                             <!-- Permissions Analysis -->
-                            <Border Grid.Row="3" Background="White" BorderBrush="#E9ECEF" 
+                            <Border Grid.Row="4" Background="White" BorderBrush="#E9ECEF" 
                                    BorderThickness="1" Padding="15" CornerRadius="8">
                                 <StackPanel>
                                     <TextBlock Text="Recent Permission Changes and Alerts" FontSize="14" FontWeight="Bold" 
