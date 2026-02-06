@@ -256,7 +256,8 @@ function Invoke-ActualSharePointConnection {
             $userInfo = Get-PnPCurrentUser -ErrorAction SilentlyContinue
             if ($userInfo) {
                 $currentUser = $userInfo.Title
-                $userEmail = $userInfo.UserPrincipalName -or $userInfo.Email -or $userInfo.LoginName -or "Authentication verified"
+                $userEmail = @($userInfo.UserPrincipalName, $userInfo.Email, $userInfo.LoginName, "Authentication verified") |
+                    Where-Object { $_ } | Select-Object -First 1
             }
         }
         catch {

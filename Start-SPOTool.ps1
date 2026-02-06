@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
     SharePoint Online Permissions Report Tool
@@ -22,7 +22,10 @@ Add-Type -AssemblyName System.Windows.Forms
 . "$PSScriptRoot\Functions\UI\MainWindow.ps1"
 
 # DeepDive
-. "$PSScriptRoot\Functions\UI\\DeepDive\SitesDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\SitesDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\UsersDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\GroupsDeepDive.ps1"
+. "$PSScriptRoot\Functions\UI\DeepDive\ExternalUsersDeepDive.ps1"
 
 # Global variables
 $script:SPOConnected = $false
