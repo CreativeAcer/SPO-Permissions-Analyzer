@@ -40,11 +40,16 @@ The **SharePoint Online Permissions Report Tool** is a modern, enterprise-grade 
 - **Role assignment mapping** with permission levels
 - **Security settings audit** including site features and configurations
 
-### 📈 **Advanced Reporting**
-- **List and library inventory** with security assessment
+### 📈 **Deep Dive Analysis**
+- **Sites Deep Dive** - Storage analysis, site health scoring, hub site tracking, detailed grid with search and filters
+- **Users Deep Dive** - Permission level breakdown, internal vs external classification, security risk assessment (low/medium/high)
+- **Groups Deep Dive** - Membership analysis, size distribution, group health checks (empty groups, missing owners, oversized groups)
+- **External Users Deep Dive** - Domain analysis, access level audit (read/edit/full control), security findings and recommendations
+
+### 📋 **Reporting & Export**
+- **CSV export** from every deep dive window via file picker
 - **Site collection administrator tracking**
 - **Guest user identification** and access analysis
-- **Regional settings and configuration review**
 - **Comprehensive permission matrices**
 
 ### 🎨 **User Experience**
@@ -202,11 +207,11 @@ Examples of supported URLs:
 ├── 📂 Views/                        
 │   ├── 📂 Windows/
 │   │   └── MainWindow.xaml          # ← Main window XAML
-│   └── 📂 DeepDive/                     
+│   └── 📂 DeepDive/
 │       ├── SitesDeepDive.xaml           # Sites deep dive window
-│       ├── UsersDeepDive.xaml           # (future) Users deep dive
-│       ├── GroupsDeepDive.xaml          # (future) Groups deep dive
-│       └── ExternalUsersDeepDive.xaml   # (future) External users deep dive
+│       ├── UsersDeepDive.xaml           # Users deep dive window
+│       ├── GroupsDeepDive.xaml          # Groups deep dive window
+│       └── ExternalUsersDeepDive.xaml   # External users deep dive window
 ├── 📂 Functions/                    # Core functionality
 │   ├── 📂 Core/                    # Foundation components
 │   │   ├── Settings.ps1            # In-memory settings management
@@ -221,11 +226,11 @@ Examples of supported URLs:
 │       ├── OperationsTab.ps1        # SharePoint Operations tab logic
 │       ├── VisualAnalyticsTab.ps1   # Visual Analytics tab logic
 │       └── HelpTab.ps1             # Help tab logic (minimal)
-│       └── 📂 DeepDive/                  #
+│       └── 📂 DeepDive/
 │           ├── SitesDeepDive.ps1        # Sites deep dive logic
-│           ├── UsersDeepDive.ps1        # (future)
-│           ├── GroupsDeepDive.ps1       # (future)
-│           └── ExternalUsersDeepDive.ps1 # (future)
+│           ├── UsersDeepDive.ps1        # Users deep dive logic
+│           ├── GroupsDeepDive.ps1       # Groups deep dive logic
+│           └── ExternalUsersDeepDive.ps1 # External users deep dive logic
 ├── 📂 Logs/                        # Application logs (created automatically)
 └── 📂 Reports/                     # Generated reports (created automatically)
     └── Generated/                  # Output directory

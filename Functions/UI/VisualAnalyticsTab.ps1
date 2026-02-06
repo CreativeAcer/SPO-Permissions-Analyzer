@@ -259,55 +259,89 @@ function Update-StorageChart {
 function Update-PermissionChart {
     <#
     .SYNOPSIS
-    Updates the permission distribution chart
+    Updates the permission distribution chart using real data from the data manager
     #>
     try {
         $script:canvasPermissionChart.Children.Clear()
-        
-        # Demo permission distribution data - can be made dynamic later
-        $permissions = @(
-            @{Name = "Full Control"; Count = 12; Color = "#DC3545"},
-            @{Name = "Edit"; Count = 25; Color = "#FFC107"},
-            @{Name = "Read"; Count = 18; Color = "#28A745"},
-            @{Name = "View Only"; Count = 5; Color = "#17A2B8"}
-        )
-        
+
+        # Build permission distribution from actual user and group data
+        $permissionCounts = @{}
+
+        $users = Get-SharePointData -DataType "Users"
+        foreach ($user in $users) {
+            $perm = if ($user["Permission"]) { $user["Permission"] } else { "Unknown" }
+            if ($permissionCounts.ContainsKey($perm)) {
+                $permissionCounts[$perm]++
+            } else {
+                $permissionCounts[$perm] = 1
+            }
+        }
+
+        $groups = Get-SharePointData -DataType "Groups"
+        foreach ($group in $groups) {
+            $perm = if ($group["Permission"]) { $group["Permission"] } else { "Unknown" }
+            $memberCount = if ($group["MemberCount"]) { [int]$group["MemberCount"] } else { 1 }
+            if ($permissionCounts.ContainsKey($perm)) {
+                $permissionCounts[$perm] += $memberCount
+            } else {
+                $permissionCounts[$perm] = $memberCount
+            }
+        }
+
+        if ($permissionCounts.Count -eq 0) {
+            Add-ChartPlaceholder -Canvas $script:canvasPermissionChart -Text "No permission data available - Run permission analysis first"
+            return
+        }
+
+        # Map permission names to colors
+        $colorMap = @{
+            "Full Control"     = "#DC3545"
+            "Edit"             = "#FFC107"
+            "Read"             = "#28A745"
+            "View Only"        = "#17A2B8"
+            "Member"           = "#FFC107"
+            "Group Permission" = "#6F42C1"
+            "Unknown"          = "#6C757D"
+        }
+
+        # Build sorted permissions array
+        $permissions = @()
+        foreach ($key in $permissionCounts.Keys | Sort-Object) {
+            $color = if ($colorMap.ContainsKey($key)) { $colorMap[$key] } else { "#6C757D" }
+            $permissions += @{ Name = $key; Count = $permissionCounts[$key]; Color = $color }
+        }
+
         $total = ($permissions | Measure-Object -Property Count -Sum).Sum
-        if ($total -eq 0) { $total = 1 } # Prevent division by zero
-        
+        if ($total -eq 0) { $total = 1 }
+
         $startY = 20
         $barHeight = 25
         $maxBarWidth = 150
-        
+
         for ($i = 0; $i -lt $permissions.Count; $i++) {
             $perm = $permissions[$i]
-            $barWidth = ($perm.Count / $total) * $maxBarWidth
-            
-            # Create permission bar
+            $barWidth = [Math]::Max(($perm.Count / $total) * $maxBarWidth, 5)
+
             $bar = New-Object System.Windows.Shapes.Rectangle
             $bar.Width = $barWidth
             $bar.Height = $barHeight
             $bar.Fill = $perm.Color
-            
-            # Position bar
+
             [System.Windows.Controls.Canvas]::SetLeft($bar, 10)
             [System.Windows.Controls.Canvas]::SetTop($bar, $startY + ($i * ($barHeight + 10)))
-            
             $script:canvasPermissionChart.Children.Add($bar)
-            
-            # Add permission label
+
             $label = New-Object System.Windows.Controls.TextBlock
             $label.Text = "$($perm.Name): $($perm.Count)"
             $label.FontSize = 10
             $label.Foreground = "#495057"
-            
+
             [System.Windows.Controls.Canvas]::SetLeft($label, $barWidth + 20)
             [System.Windows.Controls.Canvas]::SetTop($label, $startY + ($i * ($barHeight + 10)) + 5)
-            
             $script:canvasPermissionChart.Children.Add($label)
         }
-        
-        Write-ActivityLog "Permission chart updated successfully" -Level "Information"
+
+        Write-ActivityLog "Permission chart updated with real data ($($permissions.Count) permission levels)" -Level "Information"
     }
     catch {
         Write-ActivityLog "Error updating permission chart: $($_.Exception.Message)" -Level "Warning"
@@ -626,53 +660,98 @@ function Open-SitesDeepDive {
 function Open-UsersDeepDive {
     <#
     .SYNOPSIS
-    Opens the Users deep dive window (placeholder for future implementation)
+    Opens the Users deep dive window
     #>
     try {
-        [System.Windows.MessageBox]::Show(
-            "Users Deep Dive coming soon!`n`nThis will show:`n• Detailed user list`n• Permission levels`n• External vs Internal users`n• User activity analysis`n• Security recommendations",
-            "Coming Soon",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Information
-        )
+        Write-ActivityLog "Opening Users deep dive from Visual Analytics" -Level "Information"
+
+        $users = Get-SharePointData -DataType "Users"
+
+        if ($users.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No users data available. Please run 'Get Users' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-UsersDeepDive
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Open-UsersDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open Users deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
     }
 }
 
 function Open-GroupsDeepDive {
     <#
     .SYNOPSIS
-    Opens the Groups deep dive window (placeholder for future implementation)
+    Opens the Groups deep dive window
     #>
     try {
-        [System.Windows.MessageBox]::Show(
-            "Groups Deep Dive coming soon!`n`nThis will show:`n• Group memberships`n• Nested groups analysis`n• Permission inheritance`n• Group owner details`n• Recommendations",
-            "Coming Soon",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Information
-        )
+        Write-ActivityLog "Opening Groups deep dive from Visual Analytics" -Level "Information"
+
+        $groups = Get-SharePointData -DataType "Groups"
+
+        if ($groups.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No groups data available. Please run 'Get Groups' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-GroupsDeepDive
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Open-GroupsDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open Groups deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
     }
 }
 function Open-ExternalUsersDeepDive {
     <#
     .SYNOPSIS
-    Opens the External Users deep dive window (placeholder for future implementation)
+    Opens the External Users deep dive window
     #>
     try {
-        [System.Windows.MessageBox]::Show(
-            "External Users Deep Dive coming soon!`n`nThis will show:`n• External user details`n• Access levels`n• Sharing links`n• Guest user activity`n• Security audit trail",
-            "Coming Soon",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Information
-        )
+        Write-ActivityLog "Opening External Users deep dive from Visual Analytics" -Level "Information"
+
+        $users = Get-SharePointData -DataType "Users"
+
+        if ($users.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No users data available. Please run 'Get Users' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-ExternalUsersDeepDive
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Open-ExternalUsersDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open External Users deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
     }
 }
 function Add-ClickableTooltips {
