@@ -985,49 +985,57 @@ function Show-ReportProgress {
     }
 }
 
-# Helper function for UI updates and waiting
-function Update-UIAndWait {
-    param([int]$WaitMs = 500)
+# [MARKED FOR DELETION] Duplicate of Update-UIAndWait in MainWindow.ps1
+# The MainWindow.ps1 version is more complete (uses WPF Dispatcher.Invoke in addition to
+# DoEvents, defaults $WaitMs=0, conditional sleep). This WinForms-only variant was introduced
+# in the same commit ("Mainwindow logic split", 2025-08-11) and is already overridden at
+# runtime since MainWindow.ps1 loads after OperationsTab.ps1.
+# function Update-UIAndWait {
+#     param([int]$WaitMs = 500)
+#
+#     try {
+#         # Force UI update
+#         [System.Windows.Forms.Application]::DoEvents()
+#
+#         # Wait for specified time
+#         Start-Sleep -Milliseconds $WaitMs
+#     }
+#     catch {
+#         # Ignore errors in UI updates
+#         Start-Sleep -Milliseconds $WaitMs
+#     }
+# }
 
-    try {
-        # Force UI update
-        [System.Windows.Forms.Application]::DoEvents()
-
-        # Wait for specified time
-        Start-Sleep -Milliseconds $WaitMs
-    }
-    catch {
-        # Ignore errors in UI updates
-        Start-Sleep -Milliseconds $WaitMs
-    }
-}
-
-# Helper function to write console output
-function Write-ConsoleOutput {
-    param(
-        [string]$Message,
-        [switch]$Append,
-        [switch]$ForceUpdate
-    )
-
-    try {
-        if ($Append) {
-            $script:txtOperationsResults.Text += "`n$Message"
-        } else {
-            $script:txtOperationsResults.Text = $Message
-        }
-
-        if ($ForceUpdate) {
-            # Scroll to bottom
-            $script:txtOperationsResults.SelectionStart = $script:txtOperationsResults.Text.Length
-            $script:txtOperationsResults.ScrollToCaret()
-
-            # Force UI refresh
-            [System.Windows.Forms.Application]::DoEvents()
-        }
-    }
-    catch {
-        # Fallback to Write-Host if UI is not available
-        Write-Host $Message
-    }
-}
+# [MARKED FOR DELETION] Duplicate of Write-ConsoleOutput in MainWindow.ps1
+# The MainWindow.ps1 version uses correct WPF APIs (.ScrollToEnd(), Dispatcher-based refresh,
+# $NewLine parameter). This variant uses WinForms APIs (.SelectionStart/.ScrollToCaret()) that
+# are incompatible with the WPF TextBox. Introduced in the same commit ("Mainwindow logic split",
+# 2025-08-11) and already overridden at runtime since MainWindow.ps1 loads after OperationsTab.ps1.
+# function Write-ConsoleOutput {
+#     param(
+#         [string]$Message,
+#         [switch]$Append,
+#         [switch]$ForceUpdate
+#     )
+#
+#     try {
+#         if ($Append) {
+#             $script:txtOperationsResults.Text += "`n$Message"
+#         } else {
+#             $script:txtOperationsResults.Text = $Message
+#         }
+#
+#         if ($ForceUpdate) {
+#             # Scroll to bottom
+#             $script:txtOperationsResults.SelectionStart = $script:txtOperationsResults.Text.Length
+#             $script:txtOperationsResults.ScrollToCaret()
+#
+#             # Force UI refresh
+#             [System.Windows.Forms.Application]::DoEvents()
+#         }
+#     }
+#     catch {
+#         # Fallback to Write-Host if UI is not available
+#         Write-Host $Message
+#     }
+# }

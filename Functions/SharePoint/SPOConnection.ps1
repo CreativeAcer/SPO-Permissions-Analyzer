@@ -270,209 +270,216 @@ function Install-PnPModule {
 #     }
 # }
 
-function Get-DetailedSiteInformation {
-    <#
-    .SYNOPSIS
-    Gets detailed site information for deep dive analysis
-    #>
-    try {
-        Write-ActivityLog "Fetching detailed site information for deep dive" -Level "Information"
-        
-        $detailedSites = @()
-        
-        if ($script:SPOConnected) {
-            # Try to get tenant-level sites first
-            try {
-                $sites = Get-PnPTenantSite -ErrorAction Stop
-                
-                foreach ($site in $sites) {
-                    $siteData = @{
-                        Title = $site.Title
-                        Url = $site.Url
-                        Owner = if ($site.Owner) { $site.Owner } else { $site.SiteOwnerEmail }
-                        Storage = if ($site.StorageUsageCurrent) { $site.StorageUsageCurrent.ToString() } else { "0" }
-                        StorageQuota = if ($site.StorageQuota) { $site.StorageQuota } else { 0 }
-                        Template = if ($site.Template) { $site.Template } else { "N/A" }
-                        LastModified = if ($site.LastContentModifiedDate) { $site.LastContentModifiedDate.ToString("yyyy-MM-dd") } else { "N/A" }
-                        Created = if ($site.Created) { $site.Created.ToString("yyyy-MM-dd") } else { "N/A" }
-                        IsHubSite = if ($site.IsHubSite) { $site.IsHubSite } else { $false }
-                        HubSiteId = if ($site.HubSiteId) { $site.HubSiteId } else { $null }
-                        SharingCapability = if ($site.SharingCapability) { $site.SharingCapability } else { "N/A" }
-                        Status = if ($site.Status) { $site.Status } else { "Active" }
-                        LockState = if ($site.LockState) { $site.LockState } else { "Unlock" }
-                        WebsCount = if ($site.WebsCount) { $site.WebsCount } else { 0 }
-                        HasUniquePermissions = $false  # Will be updated if we can connect to the site
-                    }
-                    
-                    # Try to get additional details by connecting to each site
-                    try {
-                        Connect-PnPOnline -Url $site.Url -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive -ErrorAction SilentlyContinue
-                        $web = Get-PnPWeb -ErrorAction SilentlyContinue
-                        
-                        if ($web) {
-                            $siteData["HasUniquePermissions"] = $web.HasUniqueRoleAssignments
-                            
-                            # Get user and group counts if possible
-                            try {
-                                $users = Get-PnPUser -ErrorAction SilentlyContinue
-                                $groups = Get-PnPGroup -ErrorAction SilentlyContinue
-                                
-                                if ($users) { $siteData["UserCount"] = $users.Count }
-                                if ($groups) { $siteData["GroupCount"] = $groups.Count }
-                            }
-                            catch { }
-                        }
-                    }
-                    catch {
-                        Write-ActivityLog "Could not get additional details for site: $($site.Url)" -Level "Warning"
-                    }
-                    
-                    $detailedSites += $siteData
-                }
-            }
-            catch {
-                Write-ActivityLog "Tenant-level enumeration failed, using fallback" -Level "Warning"
-                
-                # Fallback: Get current site details only
-                try {
-                    $web = Get-PnPWeb -ErrorAction Stop
-                    $site = Get-PnPSite -ErrorAction Stop
-                    
-                    $siteData = @{
-                        Title = $web.Title
-                        Url = $web.Url
-                        Owner = "Current User"
-                        Storage = if ($site.Usage) { [math]::Round($site.Usage.Storage / 1MB, 0).ToString() } else { "0" }
-                        StorageQuota = if ($site.Usage) { [math]::Round($site.Usage.StoragePercentageUsed, 0) } else { 0 }
-                        Template = $web.WebTemplate
-                        LastModified = if ($web.LastItemModifiedDate) { $web.LastItemModifiedDate.ToString("yyyy-MM-dd") } else { "N/A" }
-                        Created = if ($web.Created) { $web.Created.ToString("yyyy-MM-dd") } else { "N/A" }
-                        IsHubSite = $false
-                        HasUniquePermissions = $web.HasUniqueRoleAssignments
-                        Status = "Active"
-                        LockState = "Unlock"
-                    }
-                    
-                    $detailedSites += $siteData
-                }
-                catch {
-                    Write-ActivityLog "Failed to get site details: $($_.Exception.Message)" -Level "Error"
-                }
-            }
-        }
-        
-        Write-ActivityLog "Retrieved detailed information for $($detailedSites.Count) sites" -Level "Information"
-        return $detailedSites
-        
-    }
-    catch {
-        Write-ErrorLog -Message $_.Exception.Message -Location "Get-DetailedSiteInformation"
-        return @()
-    }
-}
+# [MARKED FOR DELETION] Duplicate of Get-DetailedSiteInformation in SitesDeepDive.ps1
+# The version in SitesDeepDive.ps1 is more complete (admin URL escalation, per-site storage
+# retrieval). This earlier draft was introduced in the same commit ("init deepdive", 2025-08-19)
+# and is already overridden at runtime since SitesDeepDive.ps1 loads last.
+# function Get-DetailedSiteInformation {
+#     <#
+#     .SYNOPSIS
+#     Gets detailed site information for deep dive analysis
+#     #>
+#     try {
+#         Write-ActivityLog "Fetching detailed site information for deep dive" -Level "Information"
+#
+#         $detailedSites = @()
+#
+#         if ($script:SPOConnected) {
+#             # Try to get tenant-level sites first
+#             try {
+#                 $sites = Get-PnPTenantSite -ErrorAction Stop
+#
+#                 foreach ($site in $sites) {
+#                     $siteData = @{
+#                         Title = $site.Title
+#                         Url = $site.Url
+#                         Owner = if ($site.Owner) { $site.Owner } else { $site.SiteOwnerEmail }
+#                         Storage = if ($site.StorageUsageCurrent) { $site.StorageUsageCurrent.ToString() } else { "0" }
+#                         StorageQuota = if ($site.StorageQuota) { $site.StorageQuota } else { 0 }
+#                         Template = if ($site.Template) { $site.Template } else { "N/A" }
+#                         LastModified = if ($site.LastContentModifiedDate) { $site.LastContentModifiedDate.ToString("yyyy-MM-dd") } else { "N/A" }
+#                         Created = if ($site.Created) { $site.Created.ToString("yyyy-MM-dd") } else { "N/A" }
+#                         IsHubSite = if ($site.IsHubSite) { $site.IsHubSite } else { $false }
+#                         HubSiteId = if ($site.HubSiteId) { $site.HubSiteId } else { $null }
+#                         SharingCapability = if ($site.SharingCapability) { $site.SharingCapability } else { "N/A" }
+#                         Status = if ($site.Status) { $site.Status } else { "Active" }
+#                         LockState = if ($site.LockState) { $site.LockState } else { "Unlock" }
+#                         WebsCount = if ($site.WebsCount) { $site.WebsCount } else { 0 }
+#                         HasUniquePermissions = $false  # Will be updated if we can connect to the site
+#                     }
+#
+#                     # Try to get additional details by connecting to each site
+#                     try {
+#                         Connect-PnPOnline -Url $site.Url -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive -ErrorAction SilentlyContinue
+#                         $web = Get-PnPWeb -ErrorAction SilentlyContinue
+#
+#                         if ($web) {
+#                             $siteData["HasUniquePermissions"] = $web.HasUniqueRoleAssignments
+#
+#                             # Get user and group counts if possible
+#                             try {
+#                                 $users = Get-PnPUser -ErrorAction SilentlyContinue
+#                                 $groups = Get-PnPGroup -ErrorAction SilentlyContinue
+#
+#                                 if ($users) { $siteData["UserCount"] = $users.Count }
+#                                 if ($groups) { $siteData["GroupCount"] = $groups.Count }
+#                             }
+#                             catch { }
+#                         }
+#                     }
+#                     catch {
+#                         Write-ActivityLog "Could not get additional details for site: $($site.Url)" -Level "Warning"
+#                     }
+#
+#                     $detailedSites += $siteData
+#                 }
+#             }
+#             catch {
+#                 Write-ActivityLog "Tenant-level enumeration failed, using fallback" -Level "Warning"
+#
+#                 # Fallback: Get current site details only
+#                 try {
+#                     $web = Get-PnPWeb -ErrorAction Stop
+#                     $site = Get-PnPSite -ErrorAction Stop
+#
+#                     $siteData = @{
+#                         Title = $web.Title
+#                         Url = $web.Url
+#                         Owner = "Current User"
+#                         Storage = if ($site.Usage) { [math]::Round($site.Usage.Storage / 1MB, 0).ToString() } else { "0" }
+#                         StorageQuota = if ($site.Usage) { [math]::Round($site.Usage.StoragePercentageUsed, 0) } else { 0 }
+#                         Template = $web.WebTemplate
+#                         LastModified = if ($web.LastItemModifiedDate) { $web.LastItemModifiedDate.ToString("yyyy-MM-dd") } else { "N/A" }
+#                         Created = if ($web.Created) { $web.Created.ToString("yyyy-MM-dd") } else { "N/A" }
+#                         IsHubSite = $false
+#                         HasUniquePermissions = $web.HasUniqueRoleAssignments
+#                         Status = "Active"
+#                         LockState = "Unlock"
+#                     }
+#
+#                     $detailedSites += $siteData
+#                 }
+#                 catch {
+#                     Write-ActivityLog "Failed to get site details: $($_.Exception.Message)" -Level "Error"
+#                 }
+#             }
+#         }
+#
+#         Write-ActivityLog "Retrieved detailed information for $($detailedSites.Count) sites" -Level "Information"
+#         return $detailedSites
+#
+#     }
+#     catch {
+#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-DetailedSiteInformation"
+#         return @()
+#     }
+# }
 
-function Get-SiteHealthMetrics {
-    <#
-    .SYNOPSIS
-    Gets health metrics for a specific site
-    #>
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$SiteUrl
-    )
-    
-    try {
-        Write-ActivityLog "Getting health metrics for site: $SiteUrl" -Level "Information"
-        
-        $healthMetrics = @{
-            SiteUrl = $SiteUrl
-            HealthScore = 100  # Start with perfect score
-            Issues = @()
-            Recommendations = @()
-        }
-        
-        # Connect to the site
-        Connect-PnPOnline -Url $SiteUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive
-        
-        # Check storage usage
-        $site = Get-PnPSite
-        if ($site.Usage) {
-            $storagePercentage = $site.Usage.StoragePercentageUsed
-            
-            if ($storagePercentage -gt 90) {
-                $healthMetrics.HealthScore -= 30
-                $healthMetrics.Issues += "Critical: Storage usage above 90%"
-                $healthMetrics.Recommendations += "Immediately archive or delete unnecessary content"
-            }
-            elseif ($storagePercentage -gt 75) {
-                $healthMetrics.HealthScore -= 15
-                $healthMetrics.Issues += "Warning: Storage usage above 75%"
-                $healthMetrics.Recommendations += "Plan for storage cleanup or quota increase"
-            }
-        }
-        
-        # Check for orphaned permissions
-        $web = Get-PnPWeb
-        if ($web.HasUniqueRoleAssignments) {
-            $roleAssignments = Get-PnPProperty -ClientObject $web -Property RoleAssignments
-            
-            # Check for empty groups or invalid principals
-            foreach ($assignment in $roleAssignments) {
-                try {
-                    $member = Get-PnPProperty -ClientObject $assignment -Property Member
-                    if (-not $member -or $member.PrincipalType -eq "None") {
-                        $healthMetrics.HealthScore -= 10
-                        $healthMetrics.Issues += "Orphaned permission assignment detected"
-                        $healthMetrics.Recommendations += "Review and clean up permission assignments"
-                        break
-                    }
-                }
-                catch { }
-            }
-        }
-        
-        # Check for external sharing
-        $lists = Get-PnPList
-        $externalSharingDetected = $false
-        
-        foreach ($list in $lists | Where-Object { -not $_.Hidden }) {
-            if ($list.HasUniqueRoleAssignments) {
-                $healthMetrics.HealthScore -= 5
-                $externalSharingDetected = $true
-                break
-            }
-        }
-        
-        if ($externalSharingDetected) {
-            $healthMetrics.Issues += "Multiple lists with unique permissions detected"
-            $healthMetrics.Recommendations += "Review list-level permissions for consistency"
-        }
-        
-        # Check last activity
-        if ($web.LastItemModifiedDate) {
-            $daysSinceModified = (Get-Date) - $web.LastItemModifiedDate
-            
-            if ($daysSinceModified.Days -gt 180) {
-                $healthMetrics.HealthScore -= 20
-                $healthMetrics.Issues += "Site inactive for over 180 days"
-                $healthMetrics.Recommendations += "Consider archiving or deleting if no longer needed"
-            }
-            elseif ($daysSinceModified.Days -gt 90) {
-                $healthMetrics.HealthScore -= 10
-                $healthMetrics.Issues += "Site inactive for over 90 days"
-                $healthMetrics.Recommendations += "Review if site is still actively needed"
-            }
-        }
-        
-        # Ensure score doesn't go below 0
-        if ($healthMetrics.HealthScore -lt 0) { $healthMetrics.HealthScore = 0 }
-        
-        Write-ActivityLog "Health metrics calculated for site: Score = $($healthMetrics.HealthScore)" -Level "Information"
-        return $healthMetrics
-        
-    }
-    catch {
-        Write-ErrorLog -Message $_.Exception.Message -Location "Get-SiteHealthMetrics"
-        return $null
-    }
-}
+# [MARKED FOR DELETION] Duplicate of Get-SiteHealthMetrics in SitesDeepDive.ps1
+# Both copies are character-identical, introduced in the same commit ("init deepdive", 2025-08-19).
+# The canonical home is SitesDeepDive.ps1 which already overrides this at runtime.
+# function Get-SiteHealthMetrics {
+#     <#
+#     .SYNOPSIS
+#     Gets health metrics for a specific site
+#     #>
+#     param(
+#         [Parameter(Mandatory=$true)]
+#         [string]$SiteUrl
+#     )
+#
+#     try {
+#         Write-ActivityLog "Getting health metrics for site: $SiteUrl" -Level "Information"
+#
+#         $healthMetrics = @{
+#             SiteUrl = $SiteUrl
+#             HealthScore = 100  # Start with perfect score
+#             Issues = @()
+#             Recommendations = @()
+#         }
+#
+#         # Connect to the site
+#         Connect-PnPOnline -Url $SiteUrl -ClientId (Get-AppSetting -SettingName "SharePoint.ClientId") -Interactive
+#
+#         # Check storage usage
+#         $site = Get-PnPSite
+#         if ($site.Usage) {
+#             $storagePercentage = $site.Usage.StoragePercentageUsed
+#
+#             if ($storagePercentage -gt 90) {
+#                 $healthMetrics.HealthScore -= 30
+#                 $healthMetrics.Issues += "Critical: Storage usage above 90%"
+#                 $healthMetrics.Recommendations += "Immediately archive or delete unnecessary content"
+#             }
+#             elseif ($storagePercentage -gt 75) {
+#                 $healthMetrics.HealthScore -= 15
+#                 $healthMetrics.Issues += "Warning: Storage usage above 75%"
+#                 $healthMetrics.Recommendations += "Plan for storage cleanup or quota increase"
+#             }
+#         }
+#
+#         # Check for orphaned permissions
+#         $web = Get-PnPWeb
+#         if ($web.HasUniqueRoleAssignments) {
+#             $roleAssignments = Get-PnPProperty -ClientObject $web -Property RoleAssignments
+#
+#             # Check for empty groups or invalid principals
+#             foreach ($assignment in $roleAssignments) {
+#                 try {
+#                     $member = Get-PnPProperty -ClientObject $assignment -Property Member
+#                     if (-not $member -or $member.PrincipalType -eq "None") {
+#                         $healthMetrics.HealthScore -= 10
+#                         $healthMetrics.Issues += "Orphaned permission assignment detected"
+#                         $healthMetrics.Recommendations += "Review and clean up permission assignments"
+#                         break
+#                     }
+#                 }
+#                 catch { }
+#             }
+#         }
+#
+#         # Check for external sharing
+#         $lists = Get-PnPList
+#         $externalSharingDetected = $false
+#
+#         foreach ($list in $lists | Where-Object { -not $_.Hidden }) {
+#             if ($list.HasUniqueRoleAssignments) {
+#                 $healthMetrics.HealthScore -= 5
+#                 $externalSharingDetected = $true
+#                 break
+#             }
+#         }
+#
+#         if ($externalSharingDetected) {
+#             $healthMetrics.Issues += "Multiple lists with unique permissions detected"
+#             $healthMetrics.Recommendations += "Review list-level permissions for consistency"
+#         }
+#
+#         # Check last activity
+#         if ($web.LastItemModifiedDate) {
+#             $daysSinceModified = (Get-Date) - $web.LastItemModifiedDate
+#
+#             if ($daysSinceModified.Days -gt 180) {
+#                 $healthMetrics.HealthScore -= 20
+#                 $healthMetrics.Issues += "Site inactive for over 180 days"
+#                 $healthMetrics.Recommendations += "Consider archiving or deleting if no longer needed"
+#             }
+#             elseif ($daysSinceModified.Days -gt 90) {
+#                 $healthMetrics.HealthScore -= 10
+#                 $healthMetrics.Issues += "Site inactive for over 90 days"
+#                 $healthMetrics.Recommendations += "Review if site is still actively needed"
+#             }
+#         }
+#
+#         # Ensure score doesn't go below 0
+#         if ($healthMetrics.HealthScore -lt 0) { $healthMetrics.HealthScore = 0 }
+#
+#         Write-ActivityLog "Health metrics calculated for site: Score = $($healthMetrics.HealthScore)" -Level "Information"
+#         return $healthMetrics
+#
+#     }
+#     catch {
+#         Write-ErrorLog -Message $_.Exception.Message -Location "Get-SiteHealthMetrics"
+#         return $null
+#     }
+# }

@@ -508,86 +508,92 @@ function Enable-SharePointOperations {
     }
 }
 
-# Helper function for the PnP module testing (needs to be available in this scope)
-function Test-PnPModuleAvailable {
-    # Method 1: Check installed modules (prefer 3.x)
-    $moduleInstalled = Get-Module -ListAvailable -Name PnP.PowerShell -ErrorAction SilentlyContinue |
-        Sort-Object Version -Descending | Select-Object -First 1
-    
-    if ($moduleInstalled) {
-        $version = $moduleInstalled.Version
-        Write-ActivityLog "PnP module found via Get-Module: Version $version"
-        
-        # Check if it's modern version
-        if ($version -ge [version]"3.0.0") {
-            Write-ActivityLog "Modern PnP PowerShell 3.x detected"
-            return $true
-        } elseif ($version -ge [version]"2.0.0") {
-            Write-ActivityLog "Legacy PnP PowerShell 2.x detected - recommend upgrading to 3.x"
-            return $true
-        } else {
-            Write-ActivityLog "Very old PnP PowerShell detected - upgrade required"
-            return $false
-        }
-    }
-    
-    # Method 2: Try to import
-    try {
-        Import-Module PnP.PowerShell -ErrorAction Stop
-        $importedModule = Get-Module PnP.PowerShell
-        if ($importedModule) {
-            Write-ActivityLog "PnP module successfully imported: Version $($importedModule.Version)"
-            return $true
-        }
-    }
-    catch {
-        Write-ActivityLog "PnP module import failed: $($_.Exception.Message)"
-    }
-    
-    return $false
-}
+# [MARKED FOR DELETION] Duplicate of Test-PnPModuleAvailable in SPOConnection.ps1
+# The original in SPOConnection.ps1 is more complete (includes Method 3 command-availability fallback).
+# This stripped-down copy was introduced during "Mainwindow logic split" (2025-08-11) and is
+# currently overriding the original due to dot-source order — removing restores the full version.
+# function Test-PnPModuleAvailable {
+#     # Method 1: Check installed modules (prefer 3.x)
+#     $moduleInstalled = Get-Module -ListAvailable -Name PnP.PowerShell -ErrorAction SilentlyContinue |
+#         Sort-Object Version -Descending | Select-Object -First 1
+#
+#     if ($moduleInstalled) {
+#         $version = $moduleInstalled.Version
+#         Write-ActivityLog "PnP module found via Get-Module: Version $version"
+#
+#         # Check if it's modern version
+#         if ($version -ge [version]"3.0.0") {
+#             Write-ActivityLog "Modern PnP PowerShell 3.x detected"
+#             return $true
+#         } elseif ($version -ge [version]"2.0.0") {
+#             Write-ActivityLog "Legacy PnP PowerShell 2.x detected - recommend upgrading to 3.x"
+#             return $true
+#         } else {
+#             Write-ActivityLog "Very old PnP PowerShell detected - upgrade required"
+#             return $false
+#         }
+#     }
+#
+#     # Method 2: Try to import
+#     try {
+#         Import-Module PnP.PowerShell -ErrorAction Stop
+#         $importedModule = Get-Module PnP.PowerShell
+#         if ($importedModule) {
+#             Write-ActivityLog "PnP module successfully imported: Version $($importedModule.Version)"
+#             return $true
+#         }
+#     }
+#     catch {
+#         Write-ActivityLog "PnP module import failed: $($_.Exception.Message)"
+#     }
+#
+#     return $false
+# }
 
-# Helper function for the PnP module installation (simplified version)
-function Install-PnPModule {
-    param($UI)
-
-    try {
-        $UI.UpdateStatus("Installing modern PnP PowerShell 3.x...")
-        
-        # Check PowerShell version first
-        if ($PSVersionTable.PSVersion.Major -lt 7) {
-            throw "PowerShell 7.0 or later is required for modern PnP PowerShell 3.x. Current version: $($PSVersionTable.PSVersion)"
-        }
-        
-        # Check and install NuGet if needed
-        $nugetProvider = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
-        if (-not $nugetProvider -or $nugetProvider.Version -lt [version]"2.8.5.201") {
-            $UI.UpdateStatus("Installing NuGet provider...")
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-        }
-
-        # Install modern PnP PowerShell 3.x
-        $UI.UpdateStatus("Installing PnP.PowerShell 3.x...")
-        
-        $installParams = @{
-            Name = "PnP.PowerShell"
-            MinimumVersion = "3.0.0"
-            Force = $true
-            AllowClobber = $true
-            SkipPublisherCheck = $true
-            Scope = "CurrentUser"
-        }
-        
-        Install-Module @installParams
-        
-        # Force refresh and import
-        Import-Module PnP.PowerShell -Force -ErrorAction SilentlyContinue
-        
-        $UI.UpdateStatus("✅ Modern PnP PowerShell installed successfully!")
-        return $true
-    }
-    catch {
-        $UI.UpdateStatus("Error installing modern PnP module: $($_.Exception.Message)")
-        throw
-    }
-}
+# [MARKED FOR DELETION] Duplicate of Install-PnPModule in SPOConnection.ps1
+# The original in SPOConnection.ps1 is more complete (includes legacy module cleanup,
+# verbose status messages, and post-install version verification).
+# This simplified copy was introduced during "Mainwindow logic split" (2025-08-11).
+# function Install-PnPModule {
+#     param($UI)
+#
+#     try {
+#         $UI.UpdateStatus("Installing modern PnP PowerShell 3.x...")
+#
+#         # Check PowerShell version first
+#         if ($PSVersionTable.PSVersion.Major -lt 7) {
+#             throw "PowerShell 7.0 or later is required for modern PnP PowerShell 3.x. Current version: $($PSVersionTable.PSVersion)"
+#         }
+#
+#         # Check and install NuGet if needed
+#         $nugetProvider = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
+#         if (-not $nugetProvider -or $nugetProvider.Version -lt [version]"2.8.5.201") {
+#             $UI.UpdateStatus("Installing NuGet provider...")
+#             Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+#         }
+#
+#         # Install modern PnP PowerShell 3.x
+#         $UI.UpdateStatus("Installing PnP.PowerShell 3.x...")
+#
+#         $installParams = @{
+#             Name = "PnP.PowerShell"
+#             MinimumVersion = "3.0.0"
+#             Force = $true
+#             AllowClobber = $true
+#             SkipPublisherCheck = $true
+#             Scope = "CurrentUser"
+#         }
+#
+#         Install-Module @installParams
+#
+#         # Force refresh and import
+#         Import-Module PnP.PowerShell -Force -ErrorAction SilentlyContinue
+#
+#         $UI.UpdateStatus("✅ Modern PnP PowerShell installed successfully!")
+#         return $true
+#     }
+#     catch {
+#         $UI.UpdateStatus("Error installing modern PnP module: $($_.Exception.Message)")
+#         throw
+#     }
+# }
