@@ -32,11 +32,11 @@ function Make-MetricTilesClickable {
     try {
         # Find the metric card borders (parent containers of the metrics)
         $gridMetricsCards = $script:MainWindow.FindName("gridMetricsCards")
-        
+
         if ($gridMetricsCards) {
             # Total Sites Card (Column 0)
-            $sitesCard = $gridMetricsCards.Children | Where-Object { 
-                [System.Windows.Controls.Grid]::GetColumn($_) -eq 0 
+            $sitesCard = $gridMetricsCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 0
             }
             if ($sitesCard) {
                 $sitesCard.Cursor = [System.Windows.Input.Cursors]::Hand
@@ -50,10 +50,10 @@ function Make-MetricTilesClickable {
                     $this.Opacity = 1.0
                 })
             }
-            
+
             # Total Users Card (Column 1)
-            $usersCard = $gridMetricsCards.Children | Where-Object { 
-                [System.Windows.Controls.Grid]::GetColumn($_) -eq 1 
+            $usersCard = $gridMetricsCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 1
             }
             if ($usersCard) {
                 $usersCard.Cursor = [System.Windows.Input.Cursors]::Hand
@@ -67,10 +67,10 @@ function Make-MetricTilesClickable {
                     $this.Opacity = 1.0
                 })
             }
-            
+
             # Total Groups Card (Column 2)
-            $groupsCard = $gridMetricsCards.Children | Where-Object { 
-                [System.Windows.Controls.Grid]::GetColumn($_) -eq 2 
+            $groupsCard = $gridMetricsCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 2
             }
             if ($groupsCard) {
                 $groupsCard.Cursor = [System.Windows.Input.Cursors]::Hand
@@ -84,10 +84,10 @@ function Make-MetricTilesClickable {
                     $this.Opacity = 1.0
                 })
             }
-            
+
             # External Users Card (Column 3)
-            $externalCard = $gridMetricsCards.Children | Where-Object { 
-                [System.Windows.Controls.Grid]::GetColumn($_) -eq 3 
+            $externalCard = $gridMetricsCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 3
             }
             if ($externalCard) {
                 $externalCard.Cursor = [System.Windows.Input.Cursors]::Hand
@@ -101,13 +101,52 @@ function Make-MetricTilesClickable {
                     $this.Opacity = 1.0
                 })
             }
-            
+
             Write-ActivityLog "Metric tiles made clickable" -Level "Information"
         }
         else {
             Write-ActivityLog "Could not find metrics cards grid" -Level "Warning"
         }
-        
+
+        # Security Analysis Cards (P3 features)
+        $gridSecurityCards = $script:MainWindow.FindName("gridSecurityCards")
+        if ($gridSecurityCards) {
+            # Role Assignments Card (Column 0)
+            $roleCard = $gridSecurityCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 0
+            }
+            if ($roleCard) {
+                $roleCard.Cursor = [System.Windows.Input.Cursors]::Hand
+                $roleCard.Add_MouseLeftButtonUp({ Open-PermissionsDeepDive })
+                $roleCard.Add_MouseEnter({ $this.Opacity = 0.8 })
+                $roleCard.Add_MouseLeave({ $this.Opacity = 1.0 })
+            }
+
+            # Inheritance Breaks Card (Column 1)
+            $inheritanceCard = $gridSecurityCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 1
+            }
+            if ($inheritanceCard) {
+                $inheritanceCard.Cursor = [System.Windows.Input.Cursors]::Hand
+                $inheritanceCard.Add_MouseLeftButtonUp({ Open-InheritanceDeepDive })
+                $inheritanceCard.Add_MouseEnter({ $this.Opacity = 0.8 })
+                $inheritanceCard.Add_MouseLeave({ $this.Opacity = 1.0 })
+            }
+
+            # Sharing Links Card (Column 2)
+            $sharingCard = $gridSecurityCards.Children | Where-Object {
+                [System.Windows.Controls.Grid]::GetColumn($_) -eq 2
+            }
+            if ($sharingCard) {
+                $sharingCard.Cursor = [System.Windows.Input.Cursors]::Hand
+                $sharingCard.Add_MouseLeftButtonUp({ Open-SharingLinksDeepDive })
+                $sharingCard.Add_MouseEnter({ $this.Opacity = 0.8 })
+                $sharingCard.Add_MouseLeave({ $this.Opacity = 1.0 })
+            }
+
+            Write-ActivityLog "Security analysis tiles made clickable" -Level "Information"
+        }
+
     }
     catch {
         Write-ActivityLog "Error making metric tiles clickable: $($_.Exception.Message)" -Level "Warning"
@@ -125,18 +164,23 @@ function Reset-VisualAnalytics {
         $script:txtTotalUsers.Text = "0"
         $script:txtTotalGroups.Text = "0"
         $script:txtExternalUsers.Text = "0"
-        
+
+        # Reset security analysis cards
+        if ($script:txtRoleAssignments) { $script:txtRoleAssignments.Text = "0" }
+        if ($script:txtInheritanceBreaks) { $script:txtInheritanceBreaks.Text = "0" }
+        if ($script:txtSharingLinks) { $script:txtSharingLinks.Text = "0" }
+
         # Clear data displays
         $script:dgSites.ItemsSource = $null
         $script:lstPermissionAlerts.ItemsSource = $null
-        
+
         # Clear and reset charts
         Reset-StorageChart
         Reset-PermissionChart
-        
+
         # Set appropriate subtitle
         $script:txtAnalyticsSubtitle.Text = "Run an analysis operation to view visual insights"
-        
+
         Write-ActivityLog "Visual Analytics reset to initial state" -Level "Information"
     }
     catch {
@@ -754,6 +798,105 @@ function Open-ExternalUsersDeepDive {
         )
     }
 }
+function Open-PermissionsDeepDive {
+    <#
+    .SYNOPSIS
+    Opens the Role Assignment Mapping deep dive window
+    #>
+    try {
+        Write-ActivityLog "Opening Permissions deep dive from Visual Analytics" -Level "Information"
+
+        $roleAssignments = Get-SharePointData -DataType "RoleAssignments"
+
+        if ($roleAssignments.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No role assignment data available. Please run 'Analyze Permissions' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-PermissionsDeepDive
+    }
+    catch {
+        Write-ErrorLog -Message $_.Exception.Message -Location "Open-PermissionsDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open Permissions deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
+    }
+}
+
+function Open-InheritanceDeepDive {
+    <#
+    .SYNOPSIS
+    Opens the Permission Inheritance Analysis deep dive window
+    #>
+    try {
+        Write-ActivityLog "Opening Inheritance deep dive from Visual Analytics" -Level "Information"
+
+        $items = Get-SharePointData -DataType "InheritanceItems"
+
+        if ($items.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No inheritance data available. Please run 'Analyze Permissions' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-InheritanceDeepDive
+    }
+    catch {
+        Write-ErrorLog -Message $_.Exception.Message -Location "Open-InheritanceDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open Inheritance deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
+    }
+}
+
+function Open-SharingLinksDeepDive {
+    <#
+    .SYNOPSIS
+    Opens the Sharing Links Security Audit deep dive window
+    #>
+    try {
+        Write-ActivityLog "Opening Sharing Links deep dive from Visual Analytics" -Level "Information"
+
+        $links = Get-SharePointData -DataType "SharingLinks"
+
+        if ($links.Count -eq 0) {
+            [System.Windows.MessageBox]::Show(
+                "No sharing links data available. Please run 'Analyze Permissions' first.",
+                "No Data",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            )
+            return
+        }
+
+        Show-SharingLinksDeepDive
+    }
+    catch {
+        Write-ErrorLog -Message $_.Exception.Message -Location "Open-SharingLinksDeepDive"
+        [System.Windows.MessageBox]::Show(
+            "Failed to open Sharing Links deep dive: $($_.Exception.Message)",
+            "Error",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        )
+    }
+}
+
 function Add-ClickableTooltips {
     <#
     .SYNOPSIS

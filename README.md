@@ -37,7 +37,9 @@ The **SharePoint Online Permissions Report Tool** is a modern, enterprise-grade 
 - **Site-level permissions** with inheritance detection
 - **User enumeration** with detailed profile information
 - **Group analysis** with member categorization
-- **Role assignment mapping** with permission levels
+- **Role assignment mapping** - Who has what permission on what resource
+- **Permission inheritance tree** - Detects broken inheritance at site, list, and library levels
+- **Sharing link audit** - Enumerates anonymous, company-wide, and specific-people links
 - **Security settings audit** including site features and configurations
 
 ### 📈 **Deep Dive Analysis**
@@ -45,6 +47,11 @@ The **SharePoint Online Permissions Report Tool** is a modern, enterprise-grade 
 - **Users Deep Dive** - Permission level breakdown, internal vs external classification, security risk assessment (low/medium/high)
 - **Groups Deep Dive** - Membership analysis, size distribution, group health checks (empty groups, missing owners, oversized groups)
 - **External Users Deep Dive** - Domain analysis, access level audit (read/edit/full control), security findings and recommendations
+
+### 🔑 **Core Security Analysis**
+- **Role Assignment Mapping** - Maps every principal (user/group) to their exact permission level at each scope (site/list/library), with security risk scoring and filterable deep dive
+- **Permission Inheritance Tree** - Scans all lists and libraries for broken inheritance, summarizes break percentages per site, flags complexity with actionable recommendations
+- **Sharing Links Audit** - Identifies anonymous links (highest risk), company-wide links, and specific-people links; highlights anonymous edit access as critical; provides exportable security findings
 
 ### 📋 **Reporting & Export**
 - **CSV export** from every deep dive window via file picker
@@ -211,7 +218,10 @@ Examples of supported URLs:
 │       ├── SitesDeepDive.xaml           # Sites deep dive window
 │       ├── UsersDeepDive.xaml           # Users deep dive window
 │       ├── GroupsDeepDive.xaml          # Groups deep dive window
-│       └── ExternalUsersDeepDive.xaml   # External users deep dive window
+│       ├── ExternalUsersDeepDive.xaml   # External users deep dive window
+│       ├── PermissionsDeepDive.xaml     # Role assignment mapping window
+│       ├── InheritanceDeepDive.xaml     # Permission inheritance window
+│       └── SharingLinksDeepDive.xaml    # Sharing links audit window
 ├── 📂 Functions/                    # Core functionality
 │   ├── 📂 Core/                    # Foundation components
 │   │   ├── Settings.ps1            # In-memory settings management
@@ -230,7 +240,10 @@ Examples of supported URLs:
 │           ├── SitesDeepDive.ps1        # Sites deep dive logic
 │           ├── UsersDeepDive.ps1        # Users deep dive logic
 │           ├── GroupsDeepDive.ps1       # Groups deep dive logic
-│           └── ExternalUsersDeepDive.ps1 # External users deep dive logic
+│           ├── ExternalUsersDeepDive.ps1 # External users deep dive logic
+│           ├── PermissionsDeepDive.ps1  # Role assignment mapping logic
+│           ├── InheritanceDeepDive.ps1  # Permission inheritance logic
+│           └── SharingLinksDeepDive.ps1 # Sharing links audit logic
 ├── 📂 Logs/                        # Application logs (created automatically)
 └── 📂 Reports/                     # Generated reports (created automatically)
     └── Generated/                  # Output directory

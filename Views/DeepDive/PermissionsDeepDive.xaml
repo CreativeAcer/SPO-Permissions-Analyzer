@@ -1,0 +1,307 @@
+<!-- Views/DeepDive/PermissionsDeepDive.xaml -->
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Role Assignment Mapping" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#0078D4" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="&#x1F511;" FontSize="24" Foreground="White" Margin="0,0,10,0"/>
+                    <StackPanel>
+                        <TextBlock Text="Role Assignment Mapping"
+                                  FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Name="txtRoleCount" Text="Analyzing 0 role assignments"
+                                  FontSize="12" Foreground="White" Opacity="0.9"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Name="btnRefreshData" Content="&#x1F504; Refresh"
+                           Width="100" Height="30" Margin="0,0,10,0"
+                           Background="#28A745" Foreground="White" FontWeight="SemiBold"/>
+                    <Button Name="btnExport" Content="&#x1F4CA; Export"
+                           Width="100" Height="30"
+                           Background="#17A2B8" Foreground="White" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Summary Stats -->
+        <Border Grid.Row="1" Background="#F8F9FA" BorderBrush="#E9ECEF"
+               BorderThickness="0,0,0,1" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Total Assignments -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                    <TextBlock Text="Total Assignments" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtTotalAssignments" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#495057"/>
+                </StackPanel>
+
+                <!-- Full Control -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                    <TextBlock Text="Full Control" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtFullControl" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#DC3545"/>
+                </StackPanel>
+
+                <!-- Edit -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                    <TextBlock Text="Edit" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtEditCount" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#FFC107"/>
+                </StackPanel>
+
+                <!-- Read Only -->
+                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                    <TextBlock Text="Read Only" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtReadOnly" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#28A745"/>
+                </StackPanel>
+
+                <!-- Custom Roles -->
+                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                    <TextBlock Text="Custom Roles" FontSize="11" Foreground="#6C757D"/>
+                    <TextBlock Name="txtCustomRoles" Text="0" FontSize="20"
+                              FontWeight="Bold" Foreground="#6F42C1"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <TabControl Grid.Row="2" Margin="10">
+
+            <!-- All Role Assignments Tab -->
+            <TabItem Header="&#x1F4CB; All Role Assignments">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Search and Filter Bar -->
+                    <Border Grid.Row="0" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="10" Margin="0,0,0,10" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Search Box -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
+                                <TextBlock Text="&#x1F50D;" FontSize="14" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBox Name="txtSearch" Width="250" Height="25"
+                                        VerticalContentAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Role Filter -->
+                            <ComboBox Grid.Column="1" Name="cboRoleFilter" Height="25" Margin="0,0,10,0">
+                                <ComboBoxItem Content="All Roles" IsSelected="True"/>
+                                <ComboBoxItem Content="Full Control"/>
+                                <ComboBoxItem Content="Edit"/>
+                                <ComboBoxItem Content="Contribute"/>
+                                <ComboBoxItem Content="Read"/>
+                                <ComboBoxItem Content="View Only"/>
+                                <ComboBoxItem Content="Custom"/>
+                            </ComboBox>
+
+                            <!-- Principal Filter -->
+                            <ComboBox Grid.Column="2" Name="cboPrincipalFilter" Height="25">
+                                <ComboBoxItem Content="All Principals" IsSelected="True"/>
+                                <ComboBoxItem Content="Users"/>
+                                <ComboBoxItem Content="Groups"/>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Role Assignments DataGrid -->
+                    <DataGrid Grid.Row="1" Name="dgRoleAssignments" AutoGenerateColumns="False"
+                             CanUserSortColumns="True" GridLinesVisibility="Horizontal"
+                             AlternatingRowBackground="#F8F9FA" RowHeight="35">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Principal" Binding="{Binding Principal}" Width="180"/>
+                            <DataGridTextColumn Header="Principal Type" Binding="{Binding PrincipalType}" Width="100"/>
+                            <DataGridTextColumn Header="Role" Binding="{Binding Role}" Width="120"/>
+                            <DataGridTextColumn Header="Scope" Binding="{Binding Scope}" Width="120"/>
+                            <DataGridTextColumn Header="Scope URL" Binding="{Binding ScopeUrl}" Width="250"/>
+                            <DataGridTextColumn Header="Site Title" Binding="{Binding SiteTitle}" Width="180"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Role Distribution Tab -->
+            <TabItem Header="&#x1F4CA; Role Distribution">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="250"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Role Distribution Chart -->
+                    <Border Grid.Row="0" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="15" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="Role Distribution Overview" FontSize="14"
+                                      FontWeight="Bold" Margin="0,0,0,10"/>
+                            <Canvas Name="canvasRoleDistribution" Height="200" Background="#FAFAFA"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Role Breakdown -->
+                    <Border Grid.Row="1" Background="White" BorderBrush="#E9ECEF"
+                           BorderThickness="1" Padding="15" Margin="0,10,0,0" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="Role Breakdown" FontSize="14"
+                                      FontWeight="Bold" Margin="0,0,0,10"/>
+                            <DataGrid Name="dgRoleBreakdown" Height="200" AutoGenerateColumns="False"
+                                     GridLinesVisibility="None" IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Role" Binding="{Binding Role}" Width="*"/>
+                                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="100"/>
+                                    <DataGridTextColumn Header="Percentage" Binding="{Binding Percentage}" Width="100"/>
+                                    <DataGridTemplateColumn Header="Visual" Width="150">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ProgressBar Value="{Binding PercentageValue}"
+                                                           Maximum="100" Height="15"
+                                                           Foreground="{Binding BarColor}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Security Review Tab -->
+            <TabItem Header="&#x26A0;&#xFE0F; Security Review">
+                <ScrollViewer Margin="10">
+                    <StackPanel>
+                        <!-- Health Summary -->
+                        <Border Background="White" BorderBrush="#E9ECEF"
+                               BorderThickness="1" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Security Risk Summary" FontSize="14"
+                                          FontWeight="Bold" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- High Risk -->
+                                    <Border Grid.Column="0" Background="#FFEBEE" Padding="10"
+                                           Margin="0,0,5,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x1F6A8;" FontSize="24"/>
+                                            <TextBlock Name="txtHighRisk" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#C62828"/>
+                                            <TextBlock Text="High Risk" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Medium Risk -->
+                                    <Border Grid.Column="1" Background="#FFF3E0" Padding="10"
+                                           Margin="5,0,5,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x26A0;&#xFE0F;" FontSize="24"/>
+                                            <TextBlock Name="txtMediumRisk" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#F57C00"/>
+                                            <TextBlock Text="Medium Risk" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Low Risk -->
+                                    <Border Grid.Column="2" Background="#E8F5E9" Padding="10"
+                                           Margin="5,0,0,0" CornerRadius="5">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="&#x2705;" FontSize="24"/>
+                                            <TextBlock Name="txtLowRisk" Text="0" FontSize="20"
+                                                      FontWeight="Bold" Foreground="#2E7D32"/>
+                                            <TextBlock Text="Low Risk" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Security Findings List -->
+                        <Border Background="White" BorderBrush="#E9ECEF"
+                               BorderThickness="1" Padding="15" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Security Findings and Recommendations" FontSize="14"
+                                          FontWeight="Bold" Margin="0,0,0,10"/>
+                                <ListBox Name="lstSecurityFindings" Height="250" BorderThickness="0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="10" Margin="0,2" CornerRadius="5"
+                                                   Background="{Binding SeverityColor}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="30"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Icon}"
+                                                              FontSize="16" VerticalAlignment="Top"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding Finding}" FontWeight="Bold"
+                                                                  Foreground="White"/>
+                                                        <TextBlock Text="{Binding Detail}" Foreground="White"
+                                                                  TextWrapping="Wrap" Margin="0,2"/>
+                                                        <TextBlock Text="{Binding Recommendation}"
+                                                                  Foreground="White" Opacity="0.9"
+                                                                  FontStyle="Italic" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#E9ECEF"
+               BorderThickness="0,1,0,0" Padding="10">
+            <Grid>
+                <TextBlock Name="txtStatus" Text="Ready" FontSize="11"
+                          Foreground="#6C757D" HorizontalAlignment="Left"/>
+                <TextBlock Name="txtLastUpdate" Text="Last updated: Never" FontSize="11"
+                          Foreground="#6C757D" HorizontalAlignment="Right"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

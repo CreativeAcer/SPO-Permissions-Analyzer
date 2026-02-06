@@ -10,6 +10,9 @@ $script:SharePointData = @{
     Users = @()
     Groups = @()
     Permissions = @()
+    RoleAssignments = @()
+    InheritanceItems = @()
+    SharingLinks = @()
     LastOperation = ""
     LastUpdateTime = $null
     OperationMetrics = @{
@@ -19,6 +22,9 @@ $script:SharePointData = @{
         ExternalUsers = 0
         SecurityFindings = 0
         RecordsProcessed = 0
+        TotalRoleAssignments = 0
+        InheritanceBreaks = 0
+        TotalSharingLinks = 0
     }
 }
 
@@ -32,6 +38,9 @@ function Initialize-SharePointDataManager {
         Users = @()
         Groups = @()
         Permissions = @()
+        RoleAssignments = @()
+        InheritanceItems = @()
+        SharingLinks = @()
         LastOperation = ""
         LastUpdateTime = $null
         OperationMetrics = @{
@@ -41,9 +50,12 @@ function Initialize-SharePointDataManager {
             ExternalUsers = 0
             SecurityFindings = 0
             RecordsProcessed = 0
+            TotalRoleAssignments = 0
+            InheritanceBreaks = 0
+            TotalSharingLinks = 0
         }
     }
-    
+
     Write-ActivityLog "SharePoint Data Manager initialized" -Level "Information"
 }
 
@@ -134,6 +146,66 @@ function Add-SharePointGroup {
     Write-ActivityLog "Added group: $($GroupData['Name'])" -Level "Information"
 }
 
+function Add-SharePointRoleAssignment {
+    <#
+    .SYNOPSIS
+    Adds a role assignment to the data store
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [hashtable]$RoleData
+    )
+
+    if (-not $RoleData.ContainsKey("Principal")) { $RoleData["Principal"] = "Unknown" }
+    if (-not $RoleData.ContainsKey("PrincipalType")) { $RoleData["PrincipalType"] = "Unknown" }
+    if (-not $RoleData.ContainsKey("Role")) { $RoleData["Role"] = "Unknown" }
+    if (-not $RoleData.ContainsKey("Scope")) { $RoleData["Scope"] = "Site" }
+    if (-not $RoleData.ContainsKey("ScopeUrl")) { $RoleData["ScopeUrl"] = "N/A" }
+
+    $script:SharePointData.RoleAssignments += $RoleData
+    $script:SharePointData.OperationMetrics.TotalRoleAssignments = $script:SharePointData.RoleAssignments.Count
+}
+
+function Add-SharePointInheritanceItem {
+    <#
+    .SYNOPSIS
+    Adds an inheritance item to the data store
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [hashtable]$InheritanceData
+    )
+
+    if (-not $InheritanceData.ContainsKey("Title")) { $InheritanceData["Title"] = "Unknown" }
+    if (-not $InheritanceData.ContainsKey("Url")) { $InheritanceData["Url"] = "N/A" }
+    if (-not $InheritanceData.ContainsKey("Type")) { $InheritanceData["Type"] = "Unknown" }
+    if (-not $InheritanceData.ContainsKey("HasUniquePermissions")) { $InheritanceData["HasUniquePermissions"] = $false }
+
+    $script:SharePointData.InheritanceItems += $InheritanceData
+    if ($InheritanceData["HasUniquePermissions"] -eq $true) {
+        $script:SharePointData.OperationMetrics.InheritanceBreaks++
+    }
+}
+
+function Add-SharePointSharingLink {
+    <#
+    .SYNOPSIS
+    Adds a sharing link to the data store
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [hashtable]$LinkData
+    )
+
+    if (-not $LinkData.ContainsKey("GroupName")) { $LinkData["GroupName"] = "Unknown" }
+    if (-not $LinkData.ContainsKey("LinkType")) { $LinkData["LinkType"] = "Unknown" }
+    if (-not $LinkData.ContainsKey("AccessLevel")) { $LinkData["AccessLevel"] = "Unknown" }
+    if (-not $LinkData.ContainsKey("MemberCount")) { $LinkData["MemberCount"] = 0 }
+
+    $script:SharePointData.SharingLinks += $LinkData
+    $script:SharePointData.OperationMetrics.TotalSharingLinks = $script:SharePointData.SharingLinks.Count
+}
+
 function Clear-SharePointData {
     <#
     .SYNOPSIS
@@ -142,26 +214,38 @@ function Clear-SharePointData {
     param(
         [string]$DataType = "All"
     )
-    
+
     switch ($DataType) {
-        "Sites" { 
+        "Sites" {
             $script:SharePointData.Sites = @()
             $script:SharePointData.OperationMetrics.TotalSites = 0
         }
-        "Users" { 
+        "Users" {
             $script:SharePointData.Users = @()
             $script:SharePointData.OperationMetrics.TotalUsers = 0
             $script:SharePointData.OperationMetrics.ExternalUsers = 0
         }
-        "Groups" { 
+        "Groups" {
             $script:SharePointData.Groups = @()
             $script:SharePointData.OperationMetrics.TotalGroups = 0
         }
-        "All" { 
+        "RoleAssignments" {
+            $script:SharePointData.RoleAssignments = @()
+            $script:SharePointData.OperationMetrics.TotalRoleAssignments = 0
+        }
+        "InheritanceItems" {
+            $script:SharePointData.InheritanceItems = @()
+            $script:SharePointData.OperationMetrics.InheritanceBreaks = 0
+        }
+        "SharingLinks" {
+            $script:SharePointData.SharingLinks = @()
+            $script:SharePointData.OperationMetrics.TotalSharingLinks = 0
+        }
+        "All" {
             Initialize-SharePointDataManager
         }
     }
-    
+
     Write-ActivityLog "Cleared SharePoint data: $DataType" -Level "Information"
 }
 
@@ -179,6 +263,9 @@ function Get-SharePointData {
         "Users" { return $script:SharePointData.Users }
         "Groups" { return $script:SharePointData.Groups }
         "Permissions" { return $script:SharePointData.Permissions }
+        "RoleAssignments" { return $script:SharePointData.RoleAssignments }
+        "InheritanceItems" { return $script:SharePointData.InheritanceItems }
+        "SharingLinks" { return $script:SharePointData.SharingLinks }
         "Metrics" { return $script:SharePointData.OperationMetrics }
         "All" { return $script:SharePointData }
     }
@@ -219,6 +306,11 @@ function Update-VisualAnalyticsFromData {
         if ($script:txtTotalUsers) { $script:txtTotalUsers.Text = $metrics.TotalUsers.ToString() }
         if ($script:txtTotalGroups) { $script:txtTotalGroups.Text = $metrics.TotalGroups.ToString() }
         if ($script:txtExternalUsers) { $script:txtExternalUsers.Text = $metrics.ExternalUsers.ToString() }
+
+        # Update security analysis cards (P3)
+        if ($script:txtRoleAssignments) { $script:txtRoleAssignments.Text = $metrics.TotalRoleAssignments.ToString() }
+        if ($script:txtInheritanceBreaks) { $script:txtInheritanceBreaks.Text = $metrics.InheritanceBreaks.ToString() }
+        if ($script:txtSharingLinks) { $script:txtSharingLinks.Text = $metrics.TotalSharingLinks.ToString() }
         
         # Update sites data grid
         if ($sites.Count -gt 0 -and $script:dgSites) {
