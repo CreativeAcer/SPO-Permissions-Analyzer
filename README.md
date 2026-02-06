@@ -97,9 +97,17 @@ The **SharePoint Online Permissions Report Tool** is a modern, enterprise-grade 
    ```
 
 3. **Launch the application**
+
+   **Option A: Desktop (WPF)**
    ```powershell
    .\Start-SPOTool.ps1
    ```
+
+   **Option B: Web UI (Browser)**
+   ```powershell
+   .\Start-SPOTool-Web.ps1
+   ```
+   Opens `http://localhost:8080` in your default browser. Same backend, modern web frontend with Chart.js charts.
 
 That's it! The application creates any needed directories automatically and manages all settings in-memory.
 
@@ -107,7 +115,7 @@ That's it! The application creates any needed directories automatically and mana
 
 Want to see the tool in action? Try **Demo Mode**:
 
-1. Launch the application
+1. Launch the application (either WPF or Web version)
 2. Click **"Demo Mode"** on the Connection tab
 3. Explore all features with realistic sample data
 4. No SharePoint connection required!

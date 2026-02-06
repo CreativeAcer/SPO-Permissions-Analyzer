@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SharePoint Permissions Analyzer</title>
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+    <!-- Header Bar -->
+    <header id="app-header">
+        <div class="header-titles">
+            <h1>SharePoint Online Permissions Tool</h1>
+            <p>Web Interface</p>
+        </div>
+        <span id="connection-indicator">
+            <span class="status-dot disconnected"></span>
+            <span>Not connected</span>
+        </span>
+    </header>
+
+    <!-- Tab Bar -->
+    <nav id="tab-bar">
+        <button class="tab-btn active" data-tab="connection">Connection</button>
+        <button class="tab-btn" data-tab="operations">SharePoint Operations</button>
+        <button class="tab-btn" data-tab="analytics">Visual Analytics</button>
+        <button class="tab-btn" data-tab="help">Help</button>
+    </nav>
+
+    <!-- Tab Content: Connection -->
+    <div id="tab-connection" class="tab-content active">
+        <div class="card">
+            <div class="form-group">
+                <label for="input-tenant-url">SharePoint Tenant URL</label>
+                <input type="text" id="input-tenant-url" placeholder="https://yourtenant.sharepoint.com">
+            </div>
+            <div class="form-group">
+                <label for="input-client-id">App Registration Client ID</label>
+                <input type="text" id="input-client-id" placeholder="GUID format">
+            </div>
+            <div class="info-box">
+                <h3>App Registration Requirements</h3>
+                <ul>
+                    <li>Redirect URI set to <code>http://localhost</code></li>
+                    <li>API Permissions: Microsoft Graph &mdash; Sites.FullControl.All, User.Read.All, GroupMember.Read.All; SharePoint &mdash; Sites.FullControl.All</li>
+                    <li>Admin consent granted for the above permissions</li>
+                    <li>Authentication &rarr; Allow public client flows enabled</li>
+                </ul>
+            </div>
+            <div class="button-row">
+                <button id="btn-connect" class="btn btn-primary">Connect to SharePoint</button>
+                <button id="btn-demo" class="btn btn-secondary">Demo Mode</button>
+            </div>
+        </div>
+        <pre id="connection-results">Enter your SharePoint tenant URL...</pre>
+    </div>
+
+    <!-- Tab Content: Operations -->
+    <div id="tab-operations" class="tab-content">
+        <div class="status-bar">
+            <span id="operations-status">Not connected</span>
+        </div>
+        <div class="card">
+            <div class="form-group">
+                <label for="input-site-url">Site URL for Permissions Analysis (Optional)</label>
+                <input type="text" id="input-site-url">
+            </div>
+            <div class="button-row">
+                <button id="btn-get-sites" class="btn btn-primary btn-disabled">Get All Sites</button>
+                <button id="btn-analyze" class="btn btn-primary btn-disabled">Analyze Permissions</button>
+                <button id="btn-report" class="btn btn-secondary btn-disabled">Generate Report</button>
+            </div>
+        </div>
+        <pre id="operations-console">Connect to SharePoint to begin...</pre>
+    </div>
+
+    <!-- Tab Content: Analytics -->
+    <div id="tab-analytics" class="tab-content">
+        <p id="analytics-subtitle">Run an analysis to view insights</p>
+
+        <!-- Metric Cards -->
+        <div class="metrics-row">
+            <div class="metric-card blue" data-deepdive="sites">
+                <span class="metric-label">Total Sites</span>
+                <span id="metric-sites" class="metric-value">0</span>
+            </div>
+            <div class="metric-card green" data-deepdive="users">
+                <span class="metric-label">Total Users</span>
+                <span id="metric-users" class="metric-value">0</span>
+            </div>
+            <div class="metric-card orange" data-deepdive="groups">
+                <span class="metric-label">Total Groups</span>
+                <span id="metric-groups" class="metric-value">0</span>
+            </div>
+            <div class="metric-card red" data-deepdive="external">
+                <span class="metric-label">External Users</span>
+                <span id="metric-external" class="metric-value">0</span>
+            </div>
+        </div>
+
+        <!-- Security Cards -->
+        <div class="metrics-row three-col">
+            <div class="metric-card purple" data-deepdive="permissions">
+                <span class="metric-label">Role Assignments</span>
+                <span id="metric-roles" class="metric-value">0</span>
+            </div>
+            <div class="metric-card amber" data-deepdive="inheritance">
+                <span class="metric-label">Inheritance Breaks</span>
+                <span id="metric-inheritance" class="metric-value">0</span>
+            </div>
+            <div class="metric-card crimson" data-deepdive="sharing">
+                <span class="metric-label">Sharing Links</span>
+                <span id="metric-sharing" class="metric-value">0</span>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-row">
+            <div class="card chart-card">
+                <h3>Sites by Storage Usage</h3>
+                <canvas id="chart-storage"></canvas>
+            </div>
+            <div class="card chart-card">
+                <h3>Permission Level Distribution</h3>
+                <canvas id="chart-permissions"></canvas>
+            </div>
+        </div>
+
+        <!-- Sites Table -->
+        <div class="card">
+            <table id="sites-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>URL</th>
+                        <th>Owner</th>
+                        <th>Storage</th>
+                        <th>Usage Level</th>
+                    </tr>
+                </thead>
+                <tbody id="sites-table-body">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Alerts -->
+        <div id="alerts-container"></div>
+    </div>
+
+    <!-- Tab Content: Help -->
+    <div id="tab-help" class="tab-content">
+        <div class="card">
+            <h3>App Registration Setup</h3>
+            <p>To use this tool you need an Azure AD App Registration with the correct permissions configured.</p>
+            <ul>
+                <li>Go to the Azure Portal and navigate to Azure Active Directory &rarr; App registrations.</li>
+                <li>Click <strong>New registration</strong>.</li>
+                <li>Enter a name for the application (e.g. &ldquo;SPO Permissions Analyzer&rdquo;).</li>
+                <li>Set the supported account type to <strong>Single tenant</strong>.</li>
+                <li>Under Redirect URI, select <strong>Public client/native</strong> and enter <code>http://localhost</code>.</li>
+                <li>Click <strong>Register</strong> and note the Application (client) ID.</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3>Configure Permissions</h3>
+            <p>The app registration requires the following API permissions:</p>
+            <ul>
+                <li><strong>Microsoft Graph</strong> &mdash; Sites.FullControl.All (Application)</li>
+                <li><strong>Microsoft Graph</strong> &mdash; User.Read.All (Application)</li>
+                <li><strong>Microsoft Graph</strong> &mdash; GroupMember.Read.All (Application)</li>
+                <li><strong>SharePoint</strong> &mdash; Sites.FullControl.All (Application)</li>
+            </ul>
+            <p>After adding permissions, click <strong>Grant admin consent</strong> to approve them for your tenant.</p>
+        </div>
+        <div class="card">
+            <h3>Enable Public Client</h3>
+            <p>The interactive login flow requires the public client setting to be enabled:</p>
+            <ul>
+                <li>In the app registration, go to <strong>Authentication</strong>.</li>
+                <li>Under Advanced settings, set <strong>Allow public client flows</strong> to <strong>Yes</strong>.</li>
+                <li>Click <strong>Save</strong>.</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3>Usage</h3>
+            <p>Once the app registration is configured:</p>
+            <ul>
+                <li>Enter your SharePoint tenant URL in the Connection tab (e.g. <code>https://yourtenant.sharepoint.com</code>).</li>
+                <li>Enter the Application (client) ID from your app registration.</li>
+                <li>Click <strong>Connect to SharePoint</strong> and complete the interactive login.</li>
+                <li>Use the Operations tab to retrieve sites, analyze permissions, and generate reports.</li>
+                <li>View aggregated insights and charts in the Visual Analytics tab.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-container" class="modal-container">
+            <div class="modal-header">
+                <h2 id="modal-title"></h2>
+                <button id="modal-close">X</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
