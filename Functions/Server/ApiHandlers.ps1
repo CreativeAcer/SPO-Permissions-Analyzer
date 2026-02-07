@@ -29,6 +29,7 @@ function Invoke-ApiHandler {
             Handle-GetData -Response $Response -DataType $dataType
         }
         "/api/metrics"      { Handle-GetMetrics -Response $Response }
+        "/api/risk"         { Handle-GetRisk -Response $Response }
         "/api/export/*"     {
             $exportType = $Path.Replace("/api/export/", "")
             Handle-PostExport -Request $Request -Response $Response -ExportType $exportType
@@ -395,6 +396,36 @@ function Handle-GetMetrics {
         totalRoleAssignments = $metrics.TotalRoleAssignments
         inheritanceBreaks = $metrics.InheritanceBreaks
         totalSharingLinks = $metrics.TotalSharingLinks
+    }
+}
+
+# ---- Risk Assessment ----
+
+function Handle-GetRisk {
+    param($Response)
+
+    try {
+        $assessment = Get-RiskAssessment
+
+        Send-JsonResponse -Response $Response -Data @{
+            overallScore  = $assessment.OverallScore
+            riskLevel     = $assessment.RiskLevel
+            totalFindings = $assessment.TotalFindings
+            criticalCount = $assessment.CriticalCount
+            highCount     = $assessment.HighCount
+            mediumCount   = $assessment.MediumCount
+            lowCount      = $assessment.LowCount
+            findings      = @($assessment.Findings)
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            overallScore  = 0
+            riskLevel     = "Unknown"
+            totalFindings = 0
+            findings      = @()
+            error         = $_.Exception.Message
+        }
     }
 }
 

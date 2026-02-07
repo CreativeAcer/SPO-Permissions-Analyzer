@@ -247,9 +247,85 @@ async function refreshAnalytics() {
         // Generate alerts
         renderAlerts(metrics, usersRes.data);
 
+        // Risk assessment
+        await refreshRiskBanner();
+
     } catch (e) {
         console.error('Failed to refresh analytics:', e);
     }
+}
+
+async function refreshRiskBanner() {
+    try {
+        const risk = await API.getRisk();
+        const banner = document.getElementById('risk-banner');
+        if (!banner) return;
+
+        banner.classList.remove('hidden', 'risk-critical', 'risk-high', 'risk-medium', 'risk-low', 'risk-none');
+        banner.classList.add('risk-' + risk.riskLevel.toLowerCase());
+
+        setText('risk-score-value', risk.overallScore);
+        setText('risk-level', risk.riskLevel);
+
+        const parts = [];
+        if (risk.criticalCount > 0) parts.push(`${risk.criticalCount} critical`);
+        if (risk.highCount > 0) parts.push(`${risk.highCount} high`);
+        if (risk.mediumCount > 0) parts.push(`${risk.mediumCount} medium`);
+        if (risk.lowCount > 0) parts.push(`${risk.lowCount} low`);
+        setText('risk-summary', parts.length > 0
+            ? `${risk.totalFindings} finding(s): ${parts.join(', ')}`
+            : 'No security findings detected');
+
+        // Wire up details button
+        const btn = document.getElementById('btn-risk-details');
+        if (btn) {
+            btn.onclick = () => openRiskDeepDive(risk);
+        }
+
+        // Store risk data for reuse
+        appState.riskData = risk;
+    } catch (e) {
+        console.error('Failed to load risk assessment:', e);
+    }
+}
+
+function openRiskDeepDive(risk) {
+    const overlay = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    overlay.classList.remove('hidden');
+    document.getElementById('modal-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+    const escHandler = (e) => { if (e.key === 'Escape') { overlay.classList.add('hidden'); document.removeEventListener('keydown', escHandler); } };
+    document.addEventListener('keydown', escHandler);
+
+    title.textContent = `Risk Assessment (Score: ${risk.overallScore}/100)`;
+
+    const severityColors = { Critical: '#DC3545', High: '#E65100', Medium: '#FFC107', Low: '#28A745' };
+
+    let html = `<div class="dd-stats">
+        <div class="dd-stat"><span class="dd-stat-value" style="color:${severityColors[risk.riskLevel] || '#6C757D'}">${risk.overallScore}</span><span class="dd-stat-label">Risk Score</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#DC3545">${risk.criticalCount}</span><span class="dd-stat-label">Critical</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#E65100">${risk.highCount}</span><span class="dd-stat-label">High</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#FFC107">${risk.mediumCount}</span><span class="dd-stat-label">Medium</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#28A745">${risk.lowCount}</span><span class="dd-stat-label">Low</span></div>
+    </div>`;
+
+    if (risk.findings && risk.findings.length > 0) {
+        html += risk.findings.map(f => {
+            const sev = f.Severity || f.severity;
+            const color = severityColors[sev] || '#6C757D';
+            return `<div class="finding ${(sev || '').toLowerCase()}" style="border-left: 4px solid ${color}; margin-bottom: 8px;">
+                <h4>[${esc(f.RuleId || f.ruleId)}] ${esc(f.Title || f.title)} <span style="color:${color};font-size:12px">(${sev}, Score: ${f.Score || f.score})</span></h4>
+                <p>${esc(f.Description || f.description)}</p>
+            </div>`;
+        }).join('');
+    } else {
+        html += '<div class="finding low"><h4>No Issues Found</h4><p>No security findings detected. Your environment looks clean.</p></div>';
+    }
+
+    body.innerHTML = html;
 }
 
 function renderSitesTable(sites) {
