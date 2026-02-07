@@ -84,6 +84,18 @@
     <div id="tab-analytics" class="tab-content">
         <p id="analytics-subtitle">Run an analysis to view insights</p>
 
+        <!-- Risk Score Banner -->
+        <div id="risk-banner" class="risk-banner hidden">
+            <div class="risk-score-circle">
+                <span id="risk-score-value">0</span>
+            </div>
+            <div class="risk-details">
+                <h3>Risk Level: <span id="risk-level">None</span></h3>
+                <p id="risk-summary">No findings</p>
+            </div>
+            <button id="btn-risk-details" class="btn btn-secondary">View Findings</button>
+        </div>
+
         <!-- Metric Cards -->
         <div class="metrics-row">
             <div class="metric-card blue" data-deepdive="sites">

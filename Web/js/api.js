@@ -62,6 +62,10 @@ const API = {
         return this.get('enrichment');
     },
 
+    getRisk() {
+        return this.get('risk');
+    },
+
     exportData(type) {
         // Returns a download, not JSON
         window.open(`/api/export/${type}`, '_blank');
