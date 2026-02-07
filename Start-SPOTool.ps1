@@ -13,6 +13,8 @@ Add-Type -AssemblyName System.Windows.Forms
 . "$PSScriptRoot\Functions\Core\Settings.ps1"
 . "$PSScriptRoot\Functions\Core\Logging.ps1"
 . "$PSScriptRoot\Functions\Core\SharePointDatamanager.ps1"
+. "$PSScriptRoot\Functions\Core\ThrottleProtection.ps1"
+. "$PSScriptRoot\Functions\Core\Checkpoint.ps1"
 . "$PSScriptRoot\Functions\UI\UIManager.ps1"
 . "$PSScriptRoot\Functions\SharePoint\SPOConnection.ps1"
 . "$PSScriptRoot\Functions\UI\ConnectionTab.ps1"
