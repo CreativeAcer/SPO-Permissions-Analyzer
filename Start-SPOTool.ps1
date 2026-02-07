@@ -12,7 +12,7 @@ Add-Type -AssemblyName System.Windows.Forms
 # Import functions
 . "$PSScriptRoot\Functions\Core\Settings.ps1"
 . "$PSScriptRoot\Functions\Core\Logging.ps1"
-. "$PSScriptRoot\Functions\Core\SharePointDatamanager.ps1"
+. "$PSScriptRoot\Functions\Core\SharePointDataManager.ps1"
 . "$PSScriptRoot\Functions\Core\ThrottleProtection.ps1"
 . "$PSScriptRoot\Functions\Core\Checkpoint.ps1"
 . "$PSScriptRoot\Functions\Core\JsonExport.ps1"
