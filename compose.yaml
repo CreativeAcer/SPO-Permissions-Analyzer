@@ -1,0 +1,35 @@
+# ============================================
+# SPO Permissions Analyzer - Compose File
+# ============================================
+#
+# Usage:
+#   podman compose up              → Web UI at http://localhost:8080 (default)
+#   podman compose --profile local up  → WPF/XAML mode (Windows container only)
+#
+# Also works with docker compose.
+#
+# Note: Live SharePoint connections use interactive browser auth, which is
+# unavailable in headless containers. Use Demo Mode to explore all features.
+# For live connections, run the tool directly on your host instead.
+
+services:
+  spo-web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - UI_MODE=web
+      - SPO_HEADLESS=true
+      # Set these to auto-connect on startup via device code flow:
+      # - SPO_TENANT_URL=https://yourtenant.sharepoint.com
+      # - SPO_CLIENT_ID=your-app-registration-guid
+    restart: unless-stopped
+
+  spo-local:
+    build: .
+    profiles:
+      - local
+    environment:
+      - UI_MODE=local
+    # WPF mode requires Windows container with display access.
+    # On Linux containers this will exit with instructions.

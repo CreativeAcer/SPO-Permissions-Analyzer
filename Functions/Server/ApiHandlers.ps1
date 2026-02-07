@@ -53,6 +53,7 @@ function Handle-GetStatus {
     Send-JsonResponse -Response $Response -Data @{
         connected = [bool]$script:SPOConnected
         demoMode  = [bool]$script:DemoMode
+        headless  = [bool]$env:SPO_HEADLESS
         lastOperation = $script:SharePointData.LastOperation
         metrics = @{
             totalSites = $metrics.TotalSites
@@ -79,8 +80,8 @@ function Handle-PostConnect {
 
     try {
         # Save settings
-        Save-AppSetting -SettingName "SharePoint.TenantUrl" -SettingValue $body.tenantUrl
-        Save-AppSetting -SettingName "SharePoint.ClientId" -SettingValue $body.clientId
+        Set-AppSetting -SettingName "SharePoint.TenantUrl" -Value $body.tenantUrl
+        Set-AppSetting -SettingName "SharePoint.ClientId" -Value $body.clientId
 
         # Check PnP module
         if (-not (Test-PnPModuleAvailable)) {
@@ -93,7 +94,20 @@ function Handle-PostConnect {
 
         # Attempt connection
         Write-ActivityLog "Web UI connecting to: $($body.tenantUrl)" -Level "Information"
-        Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
+
+        if ($env:SPO_HEADLESS) {
+            # Container/headless mode: use device code flow
+            # The device code appears in the container terminal (podman logs / docker logs)
+            Write-Host ""
+            Write-Host "  Device code authentication requested from Web UI" -ForegroundColor Yellow
+            Write-Host "  Tenant: $($body.tenantUrl)" -ForegroundColor White
+            Write-Host ""
+            Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin
+        }
+        else {
+            # Host mode: use interactive browser popup
+            Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
+        }
 
         $web = Get-PnPWeb -ErrorAction SilentlyContinue
         $script:SPOConnected = $true

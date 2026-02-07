@@ -6,7 +6,8 @@
 let appState = {
     connected: false,
     demoMode: false,
-    dataLoaded: false
+    dataLoaded: false,
+    headless: false
 };
 
 // --- Initialization ---
@@ -47,7 +48,15 @@ async function handleConnect() {
         return;
     }
 
-    results.textContent = 'Connecting to SharePoint Online...\nPlease complete authentication in the popup window.';
+    if (appState.headless) {
+        results.textContent = 'Connecting via device code flow...\n\n'
+            + 'Check the container terminal for the authentication code.\n'
+            + '(Run "podman logs <container>" or check the terminal where compose is running)\n\n'
+            + 'Open https://microsoft.com/devicelogin and enter the code shown there.\n\n'
+            + 'Waiting for authentication...';
+    } else {
+        results.textContent = 'Connecting to SharePoint Online...\nPlease complete authentication in the popup window.';
+    }
     setButtonLoading('btn-connect', true);
 
     try {
@@ -720,6 +729,14 @@ function toast(message, type = 'info') {
 async function pollStatus() {
     try {
         const status = await API.getStatus();
+        appState.headless = !!status.headless;
+
+        // Show container auth note if headless
+        if (appState.headless) {
+            const note = document.getElementById('headless-note');
+            if (note) note.classList.remove('hidden');
+        }
+
         if (status.connected) {
             appState.connected = true;
             appState.demoMode = status.demoMode;
@@ -727,6 +744,11 @@ async function pollStatus() {
                 appState.dataLoaded = true;
             }
             updateConnectionUI(true);
+            // Show pre-connected message
+            const results = document.getElementById('connection-results');
+            if (results && !appState.demoMode) {
+                results.textContent = 'Already connected to SharePoint Online.\nYou can use SharePoint Operations.';
+            }
             if (appState.dataLoaded) await refreshAnalytics();
         }
     } catch (e) {

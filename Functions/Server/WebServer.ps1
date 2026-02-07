@@ -8,9 +8,17 @@ function Start-WebServer {
     <#
     .SYNOPSIS
     Starts a local HTTP server and opens the browser
+    .PARAMETER Port
+    Port number to listen on (default 8080)
+    .PARAMETER ListenAddress
+    Address to bind to. Use 'localhost' for local-only, '+' or '*' for all interfaces (required in containers)
+    .PARAMETER NoBrowser
+    Skip opening the default browser (used in container/headless mode)
     #>
     param(
-        [int]$Port = 8080
+        [int]$Port = 8080,
+        [string]$ListenAddress = "localhost",
+        [switch]$NoBrowser
     )
 
     $webRoot = Join-Path $PSScriptRoot "..\..\Web"
@@ -20,7 +28,7 @@ function Start-WebServer {
         throw "Web root not found at: $webRoot"
     }
 
-    $prefix = "http://localhost:$Port/"
+    $prefix = "http://${ListenAddress}:$Port/"
     $listener = [System.Net.HttpListener]::new()
     $listener.Prefixes.Add($prefix)
 
@@ -43,19 +51,24 @@ function Start-WebServer {
         Write-Host "  =======================================" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "  Server running at: " -NoNewline
-        Write-Host $prefix -ForegroundColor Green
+        Write-Host "http://localhost:$Port/" -ForegroundColor Green
+        if ($ListenAddress -ne "localhost") {
+            Write-Host "  Listening on: $prefix"
+        }
         Write-Host "  Web root: $webRoot"
         Write-Host ""
         Write-Host "  Press Ctrl+C to stop the server" -ForegroundColor Yellow
         Write-Host ""
 
-        # Open default browser
-        try {
-            Start-Process $prefix
-        }
-        catch {
-            Write-Host "  Could not open browser automatically." -ForegroundColor Yellow
-            Write-Host "  Please navigate to $prefix manually." -ForegroundColor Yellow
+        # Open default browser (skip in container/headless mode)
+        if (-not $NoBrowser) {
+            try {
+                Start-Process "http://localhost:$Port/"
+            }
+            catch {
+                Write-Host "  Could not open browser automatically." -ForegroundColor Yellow
+                Write-Host "  Please navigate to http://localhost:$Port/ manually." -ForegroundColor Yellow
+            }
         }
 
         Write-ActivityLog "Web server started on port $Port" -Level "Information"

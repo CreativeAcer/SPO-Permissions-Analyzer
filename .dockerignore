@@ -1,0 +1,22 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+*.code-workspace
+
+# Runtime artifacts
+Logs/
+Reports/
+*.log
+
+# Documentation (not needed in container)
+Images/
+CONTRIBUTING.md
+LICENSE
+
+# Container files (don't recurse)
+Dockerfile
+compose.yaml
+.dockerignore

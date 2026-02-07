@@ -98,18 +98,26 @@ The **SharePoint Online Permissions Report Tool** is a modern, enterprise-grade 
 
 3. **Launch the application**
 
-   **Option A: Desktop (WPF)**
+   **Option A: Container (Recommended)**
+   ```bash
+   podman compose up
+   ```
+   Opens the web UI at `http://localhost:8080`. No local PowerShell or module installation required.
+
+   **Option B: Desktop (WPF)**
    ```powershell
    .\Start-SPOTool.ps1
    ```
 
-   **Option B: Web UI (Browser)**
+   **Option C: Web UI (Direct)**
    ```powershell
    .\Start-SPOTool-Web.ps1
    ```
    Opens `http://localhost:8080` in your default browser. Same backend, modern web frontend with Chart.js charts.
 
 That's it! The application creates any needed directories automatically and manages all settings in-memory.
+
+> **Note**: For the WPF desktop version via container, use `podman compose --profile local up`. This requires a Windows container host with display support. On Linux containers it will fall back to instructions for running locally.
 
 ### 🎯 Quick Test with Demo Mode
 
@@ -119,6 +127,61 @@ Want to see the tool in action? Try **Demo Mode**:
 2. Click **"Demo Mode"** on the Connection tab
 3. Explore all features with realistic sample data
 4. No SharePoint connection required!
+
+---
+
+## 🐳 Container Deployment
+
+The easiest way to run the tool — no local PowerShell or module installation needed.
+
+### Prerequisites
+
+- **[Podman](https://podman.io/)** or **[Docker](https://docs.docker.com/get-docker/)**
+
+### Quick Start
+
+```bash
+# Clone and start (web UI)
+git clone https://github.com/CreativeAcer/SPO-Permissions-Analyzer.git
+cd SPO-Permissions-Analyzer
+podman compose up
+```
+
+Open `http://localhost:8080` in your browser.
+
+### Available Modes
+
+| Command | Mode | Description |
+|---------|------|-------------|
+| `podman compose up` | Web (default) | Browser UI at localhost:8080 |
+| `podman compose --profile local up` | WPF/XAML | Desktop UI (Windows container + display required) |
+
+### Build Only
+
+```bash
+podman build -t spo-analyzer .
+podman run -p 8080:8080 spo-analyzer
+```
+
+### Stopping
+
+```bash
+podman compose down
+```
+
+### Live SharePoint Connection in Container
+
+The container uses **device code flow** for authentication (no browser popup needed):
+
+**Option 1: Auto-connect on startup** — set env vars in `compose.yaml`:
+```yaml
+environment:
+  - SPO_TENANT_URL=https://yourtenant.sharepoint.com
+  - SPO_CLIENT_ID=your-app-registration-guid
+```
+The device code appears in the container terminal. Open `https://microsoft.com/devicelogin`, enter the code, authenticate, and the web server starts already connected.
+
+**Option 2: Connect via the UI** — click "Connect to SharePoint" in the web interface. The device code appears in the container terminal (`podman logs <container>`). Authenticate at the device login URL, and the UI updates when complete.
 
 ---
 
@@ -215,46 +278,62 @@ Examples of supported URLs:
 ## 📁 Project Structure
 
 ```
-📦 SPOPermissionsBase/
-├── 🚀 Start-SPOTool.ps1              # Main application entry point
+📦 SPO-Permissions-Analyzer/
+├── 🚀 Start-SPOTool.ps1              # WPF desktop entry point
+├── 🌐 Start-SPOTool-Web.ps1          # Web UI entry point
+├── 🐳 Dockerfile                     # Container image definition
+├── 🐳 compose.yaml                   # Podman/Docker compose config
+├── 🐳 docker-entrypoint.ps1          # Container entrypoint (mode dispatch)
+├── 🐳 .dockerignore                  # Container build exclusions
 ├── ⚙️ Install-Prerequisites.ps1      # Automated setup script
 ├── 📖 README.md                     # This documentation
-├── 📂 Views/                        
+├── 📂 Views/                        # WPF XAML definitions
 │   ├── 📂 Windows/
-│   │   └── MainWindow.xaml          # ← Main window XAML
+│   │   └── MainWindow.xaml
 │   └── 📂 DeepDive/
-│       ├── SitesDeepDive.xaml           # Sites deep dive window
-│       ├── UsersDeepDive.xaml           # Users deep dive window
-│       ├── GroupsDeepDive.xaml          # Groups deep dive window
-│       ├── ExternalUsersDeepDive.xaml   # External users deep dive window
-│       ├── PermissionsDeepDive.xaml     # Role assignment mapping window
-│       ├── InheritanceDeepDive.xaml     # Permission inheritance window
-│       └── SharingLinksDeepDive.xaml    # Sharing links audit window
+│       ├── SitesDeepDive.xaml
+│       ├── UsersDeepDive.xaml
+│       ├── GroupsDeepDive.xaml
+│       ├── ExternalUsersDeepDive.xaml
+│       ├── PermissionsDeepDive.xaml
+│       ├── InheritanceDeepDive.xaml
+│       └── SharingLinksDeepDive.xaml
+├── 📂 Web/                          # Web UI frontend
+│   ├── index.html                   # Single-page application
+│   ├── 📂 css/
+│   │   └── app.css                  # Fluent-inspired stylesheet
+│   └── 📂 js/
+│       ├── api.js                   # API client
+│       ├── charts.js                # Chart.js wrappers
+│       └── app.js                   # Application logic + deep dives
 ├── 📂 Functions/                    # Core functionality
-│   ├── 📂 Core/                    # Foundation components
-│   │   ├── Settings.ps1            # In-memory settings management
-│   │   ├── SharePointDataManager.ps1 # Management for retrieved data
-│   │   └── Logging.ps1             # Activity and error logging
-│   ├── 📂 SharePoint/              # SharePoint operations
-│   │   └── SPOConnection.ps1       # Authentication and data retrieval
-│   └── 📂 UI/                      # User interface
-│       ├── UIManager.ps1           # UI state management
-│       ├── MainWindow.ps1           # Main window loader & coordinator
-│       ├── ConnectionTab.ps1        # Connection tab logic
-│       ├── OperationsTab.ps1        # SharePoint Operations tab logic
-│       ├── VisualAnalyticsTab.ps1   # Visual Analytics tab logic
-│       └── HelpTab.ps1             # Help tab logic (minimal)
+│   ├── 📂 Core/                    # Foundation (shared by both UIs)
+│   │   ├── Settings.ps1
+│   │   ├── SharePointDataManager.ps1
+│   │   └── Logging.ps1
+│   ├── 📂 SharePoint/              # SharePoint operations (shared)
+│   │   └── SPOConnection.ps1
+│   ├── 📂 Server/                  # Web UI backend
+│   │   ├── WebServer.ps1           # HTTP server + static files
+│   │   └── ApiHandlers.ps1         # REST API endpoints
+│   └── 📂 UI/                      # WPF interface
+│       ├── UIManager.ps1
+│       ├── MainWindow.ps1
+│       ├── ConnectionTab.ps1
+│       ├── OperationsTab.ps1        # Operations logic (shared by both UIs)
+│       ├── VisualAnalyticsTab.ps1
+│       ├── HelpTab.ps1
 │       └── 📂 DeepDive/
-│           ├── SitesDeepDive.ps1        # Sites deep dive logic
-│           ├── UsersDeepDive.ps1        # Users deep dive logic
-│           ├── GroupsDeepDive.ps1       # Groups deep dive logic
-│           ├── ExternalUsersDeepDive.ps1 # External users deep dive logic
-│           ├── PermissionsDeepDive.ps1  # Role assignment mapping logic
-│           ├── InheritanceDeepDive.ps1  # Permission inheritance logic
-│           └── SharingLinksDeepDive.ps1 # Sharing links audit logic
-├── 📂 Logs/                        # Application logs (created automatically)
-└── 📂 Reports/                     # Generated reports (created automatically)
-    └── Generated/                  # Output directory
+│           ├── SitesDeepDive.ps1
+│           ├── UsersDeepDive.ps1
+│           ├── GroupsDeepDive.ps1
+│           ├── ExternalUsersDeepDive.ps1
+│           ├── PermissionsDeepDive.ps1
+│           ├── InheritanceDeepDive.ps1
+│           └── SharingLinksDeepDive.ps1
+├── 📂 Logs/                        # Application logs (auto-created)
+└── 📂 Reports/                     # Generated reports (auto-created)
+    └── Generated/
 ```
 
 ---
