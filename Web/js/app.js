@@ -147,6 +147,7 @@ async function handleGetSites() {
                 console_.textContent += `\n${i + 1}. ${s.Title || 'Unknown'}\n   URL: ${s.Url || 'N/A'}\n   Owner: ${s.Owner || 'N/A'}\n   Storage: ${s.Storage || '0'} MB\n`;
             });
             await refreshAnalytics();
+            await showAuditSummary(console_);
             toast(`Retrieved ${siteList.length} sites`, 'success');
         } else {
             console_.textContent += `\nError: ${res.message}`;
@@ -181,6 +182,7 @@ async function handleAnalyze() {
             console_.textContent += `\nRole Assignments: ${metrics.totalRoleAssignments} | Inheritance Breaks: ${metrics.inheritanceBreaks} | Sharing Links: ${metrics.totalSharingLinks}`;
             console_.textContent += '\n\nSwitch to Visual Analytics tab for charts and deep dives.';
             await refreshAnalytics();
+            await showAuditSummary(console_);
             toast('Permissions analysis complete', 'success');
         } else {
             console_.textContent += `\nError: ${res.message}`;
@@ -197,9 +199,21 @@ async function handleReport() {
         toast('Run an analysis first', 'info');
         return;
     }
-    // Trigger CSV exports
-    API.exportData('users');
-    toast('Report download started', 'info');
+
+    try {
+        // Export full governance JSON report
+        const report = await API.exportJson();
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `spo_governance_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Governance JSON report downloaded', 'success');
+    } catch (e) {
+        toast('Report generation failed: ' + e.message, 'error');
+    }
 }
 
 // --- Analytics Tab ---
@@ -247,9 +261,85 @@ async function refreshAnalytics() {
         // Generate alerts
         renderAlerts(metrics, usersRes.data);
 
+        // Risk assessment
+        await refreshRiskBanner();
+
     } catch (e) {
         console.error('Failed to refresh analytics:', e);
     }
+}
+
+async function refreshRiskBanner() {
+    try {
+        const risk = await API.getRisk();
+        const banner = document.getElementById('risk-banner');
+        if (!banner) return;
+
+        banner.classList.remove('hidden', 'risk-critical', 'risk-high', 'risk-medium', 'risk-low', 'risk-none');
+        banner.classList.add('risk-' + risk.riskLevel.toLowerCase());
+
+        setText('risk-score-value', risk.overallScore);
+        setText('risk-level', risk.riskLevel);
+
+        const parts = [];
+        if (risk.criticalCount > 0) parts.push(`${risk.criticalCount} critical`);
+        if (risk.highCount > 0) parts.push(`${risk.highCount} high`);
+        if (risk.mediumCount > 0) parts.push(`${risk.mediumCount} medium`);
+        if (risk.lowCount > 0) parts.push(`${risk.lowCount} low`);
+        setText('risk-summary', parts.length > 0
+            ? `${risk.totalFindings} finding(s): ${parts.join(', ')}`
+            : 'No security findings detected');
+
+        // Wire up details button
+        const btn = document.getElementById('btn-risk-details');
+        if (btn) {
+            btn.onclick = () => openRiskDeepDive(risk);
+        }
+
+        // Store risk data for reuse
+        appState.riskData = risk;
+    } catch (e) {
+        console.error('Failed to load risk assessment:', e);
+    }
+}
+
+function openRiskDeepDive(risk) {
+    const overlay = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    overlay.classList.remove('hidden');
+    document.getElementById('modal-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+    const escHandler = (e) => { if (e.key === 'Escape') { overlay.classList.add('hidden'); document.removeEventListener('keydown', escHandler); } };
+    document.addEventListener('keydown', escHandler);
+
+    title.textContent = `Risk Assessment (Score: ${risk.overallScore}/100)`;
+
+    const severityColors = { Critical: '#DC3545', High: '#E65100', Medium: '#FFC107', Low: '#28A745' };
+
+    let html = `<div class="dd-stats">
+        <div class="dd-stat"><span class="dd-stat-value" style="color:${severityColors[risk.riskLevel] || '#6C757D'}">${risk.overallScore}</span><span class="dd-stat-label">Risk Score</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#DC3545">${risk.criticalCount}</span><span class="dd-stat-label">Critical</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#E65100">${risk.highCount}</span><span class="dd-stat-label">High</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#FFC107">${risk.mediumCount}</span><span class="dd-stat-label">Medium</span></div>
+        <div class="dd-stat"><span class="dd-stat-value" style="color:#28A745">${risk.lowCount}</span><span class="dd-stat-label">Low</span></div>
+    </div>`;
+
+    if (risk.findings && risk.findings.length > 0) {
+        html += risk.findings.map(f => {
+            const sev = f.Severity || f.severity;
+            const color = severityColors[sev] || '#6C757D';
+            return `<div class="finding ${(sev || '').toLowerCase()}" style="border-left: 4px solid ${color}; margin-bottom: 8px;">
+                <h4>[${esc(f.RuleId || f.ruleId)}] ${esc(f.Title || f.title)} <span style="color:${color};font-size:12px">(${sev}, Score: ${f.Score || f.score})</span></h4>
+                <p>${esc(f.Description || f.description)}</p>
+            </div>`;
+        }).join('');
+    } else {
+        html += '<div class="finding low"><h4>No Issues Found</h4><p>No security findings detected. Your environment looks clean.</p></div>';
+    }
+
+    body.innerHTML = html;
 }
 
 function renderSitesTable(sites) {
@@ -445,16 +535,23 @@ function renderExternalDeepDive(container, allUsers) {
     });
 
     const editAccess = data.filter(u => ['Edit', 'Contribute', 'Full Control'].includes(u.Permission)).length;
+    const enrichedCount = data.filter(u => u.GraphEnriched).length;
 
     container.innerHTML = `
         <div class="dd-stats">
             <div class="dd-stat"><span class="dd-stat-value" style="color:#C62828">${data.length}</span><span class="dd-stat-label">External Users</span></div>
             <div class="dd-stat"><span class="dd-stat-value">${Object.keys(domains).length}</span><span class="dd-stat-label">Domains</span></div>
             <div class="dd-stat"><span class="dd-stat-value" style="color:#DC3545">${editAccess}</span><span class="dd-stat-label">With Edit+</span></div>
+            <div class="dd-stat"><span class="dd-stat-value" style="color:#0078D4">${enrichedCount}</span><span class="dd-stat-label">Enriched</span></div>
         </div>
         ${editAccess > 0 ? '<div class="finding high"><h4>External Users with Edit Access</h4><p>' + editAccess + ' external user(s) have edit or higher permissions. Review and restrict where possible.</p></div>' : ''}
-        <div class="dd-filter-bar"><input type="text" placeholder="Search external users..." id="dd-search"><button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button></div>
-        <table><thead><tr><th>Name</th><th>Email</th><th>Domain</th><th>Permission</th></tr></thead>
+        <div id="enrichment-banner" style="margin-bottom:12px"></div>
+        <div class="dd-filter-bar">
+            <input type="text" placeholder="Search external users..." id="dd-search">
+            <button class="btn btn-primary" id="btn-enrich" style="margin-left:8px">Enrich via Graph</button>
+            <button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button>
+        </div>
+        <table><thead><tr><th>Name</th><th>Email</th><th>Domain</th><th>Permission</th><th>Account Status</th><th>Last Sign-In</th></tr></thead>
         <tbody id="dd-ext-body">${renderExternalRows(data)}</tbody></table>`;
 
     document.getElementById('dd-search').addEventListener('input', (e) => {
@@ -462,13 +559,71 @@ function renderExternalDeepDive(container, allUsers) {
         const filtered = data.filter(u => (u.Name || '').toLowerCase().includes(q) || (u.Email || '').toLowerCase().includes(q));
         document.getElementById('dd-ext-body').innerHTML = renderExternalRows(filtered);
     });
+
+    document.getElementById('btn-enrich').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-enrich');
+        btn.textContent = 'Enriching...';
+        btn.classList.add('btn-disabled');
+        try {
+            const res = await API.enrichExternal();
+            if (res.success) {
+                toast(`Enriched ${res.enriched} of ${res.totalExternal} external users`, 'success');
+                // Reload external users data
+                const usersRes = await API.getData('users');
+                const newData = (usersRes.data || []).filter(u => u.Type === 'External' || u.IsExternal);
+                document.getElementById('dd-ext-body').innerHTML = renderExternalRows(newData);
+                // Show enrichment summary
+                showEnrichmentBanner();
+            } else {
+                toast(res.message || 'Enrichment failed', 'error');
+            }
+        } catch (e) {
+            toast('Enrichment failed: ' + e.message, 'error');
+        } finally {
+            btn.textContent = 'Enrich via Graph';
+            btn.classList.remove('btn-disabled');
+        }
+    });
+
+    // Show enrichment banner if already enriched
+    if (enrichedCount > 0) {
+        showEnrichmentBanner();
+    }
+}
+
+async function showEnrichmentBanner() {
+    try {
+        const summary = await API.getEnrichment();
+        const banner = document.getElementById('enrichment-banner');
+        if (!banner) return;
+
+        const findings = [];
+        if (summary.disabledAccounts > 0) {
+            findings.push(`<div class="finding high"><h4>${summary.disabledAccounts} disabled account(s) with access</h4><p>These accounts are disabled in Azure AD but still have SharePoint permissions. Remove their access.</p></div>`);
+        }
+        if (summary.staleAccounts > 0) {
+            findings.push(`<div class="finding medium"><h4>${summary.staleAccounts} stale external account(s)</h4><p>No sign-in activity in 90+ days. Consider removing access for inactive external users.</p></div>`);
+        }
+        if (summary.enrichedCount > 0 && findings.length === 0) {
+            findings.push(`<div class="finding low"><h4>External access looks healthy</h4><p>${summary.enrichedCount} external user(s) enriched. No disabled or stale accounts detected.</p></div>`);
+        }
+        banner.innerHTML = findings.join('');
+    } catch (e) {
+        // Non-critical, ignore
+    }
 }
 
 function renderExternalRows(data) {
     return data.map(u => {
         const email = u.Email || '';
         const domain = email.includes('@') ? email.split('@')[1] : 'Unknown';
-        return `<tr><td>${esc(u.Name)}</td><td>${esc(email)}</td><td>${esc(domain)}</td><td>${esc(u.Permission)}</td></tr>`;
+        const accountStatus = u.GraphEnriched
+            ? (u.GraphAccountEnabled ? '<span style="color:#28A745">Active</span>' : '<span style="color:#DC3545">Disabled</span>')
+            : '<span style="color:#999">-</span>';
+        const lastSignIn = u.GraphLastSignIn
+            ? new Date(u.GraphLastSignIn).toLocaleDateString()
+            : (u.GraphEnriched ? 'Never' : '-');
+        return `<tr><td>${esc(u.Name)}</td><td>${esc(email)}</td><td>${esc(domain)}</td><td>${esc(u.Permission)}</td><td>${accountStatus}</td><td>${lastSignIn}</td></tr>`;
     }).join('');
 }
 
@@ -723,6 +878,28 @@ function toast(message, type = 'info') {
     t.textContent = message;
     container.appendChild(t);
     setTimeout(() => t.remove(), 4000);
+}
+
+// --- Audit Summary ---
+async function showAuditSummary(console_) {
+    try {
+        const audit = await API.getAudit();
+        if (!audit.hasSession) return;
+
+        console_.textContent += '\n\n=== AUDIT TRAIL ===';
+        console_.textContent += `\nSession ID: ${audit.sessionId}`;
+        console_.textContent += `\nOperation: ${audit.operationType}`;
+        console_.textContent += `\nStatus: ${audit.status}`;
+        console_.textContent += `\nUser: ${audit.userPrincipal}`;
+        if (audit.duration) console_.textContent += `\nDuration: ${audit.duration}`;
+        console_.textContent += `\nEvents: ${audit.eventCount} | Errors: ${audit.errorCount}`;
+        if (audit.outputFiles && audit.outputFiles.length > 0) {
+            console_.textContent += `\nOutput files: ${audit.outputFiles.length}`;
+        }
+        console_.textContent += '\n(Full audit log saved to ./Logs/)';
+    } catch (e) {
+        // Audit info is supplementary, don't fail the operation
+    }
 }
 
 // --- Status polling (lightweight, once on load) ---

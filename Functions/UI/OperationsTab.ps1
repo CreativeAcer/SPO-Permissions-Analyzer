@@ -63,6 +63,11 @@ function Get-RealSites-DataDriven {
         # Clear previous sites data and set context
         Clear-SharePointData -DataType "Sites"
         Set-SharePointOperationContext -OperationType "Sites Analysis"
+        Start-Checkpoint -OperationType "SitesAnalysis" -Scope "Tenant"
+        Reset-ThrottleStats
+
+        # Start audit session
+        Start-AuditSession -OperationType "SitesAnalysis" -ScanScope "Tenant"
 
         # Clear console and show header
         Write-ConsoleOutput "🔍 SHAREPOINT SITES ANALYSIS" -ForceUpdate
@@ -90,7 +95,9 @@ function Get-RealSites-DataDriven {
             try {
                 Write-ConsoleOutput "🔐 Attempting admin center connection for full details..." -Append -ForceUpdate
                 Connect-PnPOnline -Url $adminUrl -ClientId $clientId -Interactive -ErrorAction Stop
-                $sites = Get-PnPTenantSite -Detailed -ErrorAction Stop
+                $sites = Invoke-WithThrottleProtection -OperationName "Get-PnPTenantSite (admin)" -ScriptBlock {
+                    Get-PnPTenantSite -Detailed -ErrorAction Stop
+                }
                 $requiresAdmin = $true
                 Write-ActivityLog "Retrieved $($sites.Count) sites with full details from admin center"
                 Write-ConsoleOutput "✅ Successfully retrieved $($sites.Count) sites with storage details" -Append -ForceUpdate
@@ -101,7 +108,9 @@ function Get-RealSites-DataDriven {
 
                 # Fallback to regular tenant connection
                 Connect-PnPOnline -Url $tenantUrl -ClientId $clientId -Interactive -ErrorAction Stop
-                $sites = Get-PnPTenantSite -ErrorAction Stop
+                $sites = Invoke-WithThrottleProtection -OperationName "Get-PnPTenantSite" -ScriptBlock {
+                    Get-PnPTenantSite -ErrorAction Stop
+                }
                 Write-ConsoleOutput "✅ Retrieved $($sites.Count) sites (limited details)" -Append -ForceUpdate
             }
         }
@@ -254,10 +263,22 @@ function Get-RealSites-DataDriven {
         Update-VisualAnalyticsFromData
 
         Write-ActivityLog "Sites operation completed with $($sites.Count) sites" -Level "Information"
+        Complete-Checkpoint -Status "Completed"
+        Write-AuditEvent -EventType "DataCollection" -Detail "Sites analysis complete: $($sites.Count) sites"
+        Complete-AuditSession -Status "Completed"
+
+        # Log throttle stats if any retries occurred
+        $throttleStats = Get-ThrottleStats
+        if ($throttleStats.TotalRetries -gt 0) {
+            Write-ConsoleOutput "⚠️ Throttle protection: $($throttleStats.TotalRetries) retries, $($throttleStats.TotalThrottled) throttle events" -Append
+        }
 
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealSites-DataDriven"
+        Complete-Checkpoint -Status "Failed"
+        Write-AuditEvent -EventType "Error" -Detail $_.Exception.Message
+        Complete-AuditSession -Status "Failed"
         Write-ConsoleOutput "" -Append
         Write-ConsoleOutput "❌ ERROR: Site enumeration failed" -Append
         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
@@ -283,6 +304,11 @@ function Get-RealPermissions-DataDriven {
         # Clear previous data and set context
         Clear-SharePointData -DataType "All"
         Set-SharePointOperationContext -OperationType "Permissions Analysis"
+        Start-Checkpoint -OperationType "PermissionsAnalysis" -Scope $siteUrl
+        Reset-ThrottleStats
+
+        # Start audit session
+        Start-AuditSession -OperationType "PermissionsAnalysis" -ScanScope $siteUrl
 
         # Clear console and show header
         Write-ConsoleOutput "🔐 SHAREPOINT PERMISSIONS ANALYSIS" -ForceUpdate
@@ -384,8 +410,11 @@ function Get-RealPermissions-DataDriven {
 
         # Get and store users
         Write-ConsoleOutput "👥 Retrieving users..." -Append -ForceUpdate
+        Update-Checkpoint -Phase "Users"
         try {
-            $users = Get-PnPUser -ErrorAction Stop
+            $users = Invoke-WithThrottleProtection -OperationName "Get-PnPUser" -ScriptBlock {
+                Get-PnPUser -ErrorAction Stop
+            }
             $userCounter = 0
             $regularUsers = $users | Where-Object {
                 $_.PrincipalType -eq "User" -and
@@ -430,8 +459,11 @@ function Get-RealPermissions-DataDriven {
 
         # Get and store groups
         Write-ConsoleOutput "👨‍👩‍👧‍👦 Retrieving groups..." -Append -ForceUpdate
+        Update-Checkpoint -Phase "Groups"
         try {
-            $groups = Get-PnPGroup -ErrorAction Stop
+            $groups = Invoke-WithThrottleProtection -OperationName "Get-PnPGroup" -ScriptBlock {
+                Get-PnPGroup -ErrorAction Stop
+            }
             $groupCounter = 0
 
             $importantGroups = $groups | Where-Object {
@@ -481,9 +513,12 @@ function Get-RealPermissions-DataDriven {
 
         # ===== ROLE ASSIGNMENT MAPPING =====
         Write-ConsoleOutput "🔑 Analyzing role assignments..." -Append -ForceUpdate
+        Update-Checkpoint -Phase "RoleAssignments"
         try {
             $web = Get-PnPWeb -ErrorAction Stop
-            $roleAssignments = Get-PnPProperty -ClientObject $web -Property RoleAssignments -ErrorAction Stop
+            $roleAssignments = Invoke-WithThrottleProtection -OperationName "Get RoleAssignments" -ScriptBlock {
+                Get-PnPProperty -ClientObject $web -Property RoleAssignments -ErrorAction Stop
+            }
             $raCounter = 0
 
             foreach ($ra in $roleAssignments) {
@@ -528,6 +563,7 @@ function Get-RealPermissions-DataDriven {
 
         # ===== PERMISSION INHERITANCE TREE =====
         Write-ConsoleOutput "🔗 Checking permission inheritance..." -Append -ForceUpdate
+        Update-Checkpoint -Phase "Inheritance"
         try {
             # Add site-level entry
             Add-SharePointInheritanceItem -InheritanceData @{
@@ -540,7 +576,9 @@ function Get-RealPermissions-DataDriven {
                 SiteTitle = $web.Title
             }
 
-            $lists = Get-PnPList -ErrorAction Stop
+            $lists = Invoke-WithThrottleProtection -OperationName "Get-PnPList" -ScriptBlock {
+                Get-PnPList -ErrorAction Stop
+            }
             $visibleLists = $lists | Where-Object { -not $_.Hidden }
             $brokenCount = 0
 
@@ -609,8 +647,11 @@ function Get-RealPermissions-DataDriven {
 
         # ===== SHARING LINKS AUDIT =====
         Write-ConsoleOutput "🔗 Auditing sharing links..." -Append -ForceUpdate
+        Update-Checkpoint -Phase "SharingLinks"
         try {
-            $allGroups = Get-PnPGroup -ErrorAction Stop
+            $allGroups = Invoke-WithThrottleProtection -OperationName "Get-PnPGroup (sharing)" -ScriptBlock {
+                Get-PnPGroup -ErrorAction Stop
+            }
             $sharingGroups = $allGroups | Where-Object { $_.Title.StartsWith("SharingLinks") }
             $linkCounter = 0
 
@@ -686,10 +727,22 @@ function Get-RealPermissions-DataDriven {
         Update-VisualAnalyticsFromData
 
         Write-ActivityLog "Permissions analysis completed with storage: $storageValue MB" -Level "Information"
+        Complete-Checkpoint -Status "Completed"
+        Write-AuditEvent -EventType "DataCollection" -Detail "Permissions analysis complete" -AffectedObject $siteUrl
+        Complete-AuditSession -Status "Completed"
+
+        # Log throttle stats if any retries occurred
+        $throttleStats = Get-ThrottleStats
+        if ($throttleStats.TotalRetries -gt 0) {
+            Write-ConsoleOutput "⚠️ Throttle protection: $($throttleStats.TotalRetries) retries, $($throttleStats.TotalThrottled) throttle events" -Append
+        }
 
     }
     catch {
         Write-ErrorLog -Message $_.Exception.Message -Location "Get-RealPermissions-DataDriven"
+        Complete-Checkpoint -Status "Failed"
+        Write-AuditEvent -EventType "Error" -Detail $_.Exception.Message
+        Complete-AuditSession -Status "Failed"
         Write-ConsoleOutput "❌ ERROR: Permissions analysis failed" -Append
         Write-ConsoleOutput "Error Details: $($_.Exception.Message)" -Append
     }

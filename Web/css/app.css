@@ -690,3 +690,57 @@ tr:hover {
 .mb-16 {
     margin-bottom: 16px;
 }
+
+/* ----- Risk Banner ----- */
+
+.risk-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 24px;
+    margin: 0 24px 16px;
+    background: white;
+    border-radius: 8px;
+    border-left: 5px solid #6C757D;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.risk-banner.risk-critical { border-left-color: #DC3545; background: #FFF5F5; }
+.risk-banner.risk-high { border-left-color: #E65100; background: #FFF8E1; }
+.risk-banner.risk-medium { border-left-color: #FFC107; background: #FFFDE7; }
+.risk-banner.risk-low { border-left-color: #28A745; background: #F1F8E9; }
+.risk-banner.risk-none { border-left-color: #28A745; background: #F1F8E9; }
+
+.risk-score-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+    background: #6C757D;
+    flex-shrink: 0;
+}
+
+.risk-critical .risk-score-circle { background: #DC3545; }
+.risk-high .risk-score-circle { background: #E65100; }
+.risk-medium .risk-score-circle { background: #FFC107; color: #323130; }
+.risk-low .risk-score-circle { background: #28A745; }
+.risk-none .risk-score-circle { background: #28A745; }
+
+.risk-details {
+    flex: 1;
+}
+
+.risk-details h3 {
+    margin-bottom: 4px;
+    font-size: 16px;
+}
+
+.risk-details p {
+    font-size: 13px;
+    color: #605E5C;
+}

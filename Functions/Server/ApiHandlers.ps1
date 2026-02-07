@@ -29,10 +29,19 @@ function Invoke-ApiHandler {
             Handle-GetData -Response $Response -DataType $dataType
         }
         "/api/metrics"      { Handle-GetMetrics -Response $Response }
+        "/api/enrich"       { Handle-PostEnrich -Response $Response }
+        "/api/enrichment"   { Handle-GetEnrichment -Response $Response }
+        "/api/risk"         { Handle-GetRisk -Response $Response }
         "/api/export/*"     {
             $exportType = $Path.Replace("/api/export/", "")
             Handle-PostExport -Request $Request -Response $Response -ExportType $exportType
         }
+        "/api/export-json"  { Handle-PostExportJson -Response $Response }
+        "/api/export-json/*" {
+            $jsonType = $Path.Replace("/api/export-json/", "")
+            Handle-PostExportJsonType -Response $Response -DataType $jsonType
+        }
+        "/api/audit"        { Handle-GetAudit -Response $Response }
         "/api/shutdown"     {
             Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Shutting down" }
             Stop-WebServer
@@ -395,6 +404,178 @@ function Handle-GetMetrics {
         totalRoleAssignments = $metrics.TotalRoleAssignments
         inheritanceBreaks = $metrics.InheritanceBreaks
         totalSharingLinks = $metrics.TotalSharingLinks
+    }
+}
+
+# ---- JSON Export ----
+
+function Handle-PostExportJson {
+    param($Response)
+
+    try {
+        $report = Build-GovernanceReport -IncludeMetadata
+        Send-JsonResponse -Response $Response -Data $report
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
+    }
+}
+
+function Handle-PostExportJsonType {
+    param($Response, [string]$DataType)
+
+    try {
+        $typeMap = @{
+            "sites"           = "Sites"
+            "users"           = "Users"
+            "groups"          = "Groups"
+            "roleassignments" = "RoleAssignments"
+            "inheritance"     = "InheritanceItems"
+            "sharinglinks"    = "SharingLinks"
+        }
+
+        $mappedType = if ($typeMap.ContainsKey($DataType.ToLower())) { $typeMap[$DataType.ToLower()] } else { $DataType }
+        $data = Get-SharePointData -DataType $mappedType
+
+        $output = [ordered]@{
+            schemaVersion = "1.0.0"
+            exportedAt    = (Get-Date).ToString("o")
+            dataType      = $DataType
+            count         = @($data).Count
+            data          = @($data)
+        }
+
+        Send-JsonResponse -Response $Response -Data $output
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
+    }
+}
+
+# ---- Graph Enrichment ----
+
+function Handle-PostEnrich {
+    param($Response)
+
+    try {
+        if ($script:DemoMode) {
+            # In demo mode, simulate enrichment
+            $users = Get-SharePointData -DataType "Users"
+            $external = @($users | Where-Object { $_.Type -eq "External" -or $_.IsExternal })
+            foreach ($u in $external) {
+                $u.GraphUserType = "Guest"
+                $u.GraphAccountEnabled = $true
+                $u.GraphLastSignIn = (Get-Date).AddDays(-(Get-Random -Minimum 1 -Maximum 120)).ToString("o")
+                $u.GraphCreatedDate = (Get-Date).AddDays(-(Get-Random -Minimum 30 -Maximum 365)).ToString("o")
+                $u.GraphDisplayName = $u.Name
+                $u.GraphEnriched = $true
+            }
+            Send-JsonResponse -Response $Response -Data @{
+                success       = $true
+                totalExternal = $external.Count
+                enriched      = $external.Count
+                failed        = 0
+            }
+            return
+        }
+
+        $result = Invoke-ExternalUserEnrichment
+        Send-JsonResponse -Response $Response -Data @{
+            success       = $true
+            totalExternal = $result.TotalExternal
+            enriched      = $result.Enriched
+            failed        = $result.Failed
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            message = "Enrichment failed: $($_.Exception.Message)"
+        }
+    }
+}
+
+function Handle-GetEnrichment {
+    param($Response)
+
+    try {
+        $summary = Get-EnrichmentSummary
+
+        Send-JsonResponse -Response $Response -Data @{
+            totalExternal    = $summary.TotalExternal
+            enrichedCount    = $summary.EnrichedCount
+            disabledAccounts = $summary.DisabledAccounts
+            guestUsers       = $summary.GuestUsers
+            staleAccounts    = $summary.StaleAccounts
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            totalExternal = 0
+            enrichedCount = 0
+            error         = $_.Exception.Message
+        }
+    }
+}
+
+# ---- Risk Assessment ----
+
+function Handle-GetRisk {
+    param($Response)
+
+    try {
+        $assessment = Get-RiskAssessment
+
+        Send-JsonResponse -Response $Response -Data @{
+            overallScore  = $assessment.OverallScore
+            riskLevel     = $assessment.RiskLevel
+            totalFindings = $assessment.TotalFindings
+            criticalCount = $assessment.CriticalCount
+            highCount     = $assessment.HighCount
+            mediumCount   = $assessment.MediumCount
+            lowCount      = $assessment.LowCount
+            findings      = @($assessment.Findings)
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            overallScore  = 0
+            riskLevel     = "Unknown"
+            totalFindings = 0
+            findings      = @()
+            error         = $_.Exception.Message
+        }
+    }
+}
+
+# ---- Audit ----
+
+function Handle-GetAudit {
+    param($Response)
+
+    $session = Get-AuditSession
+    if (-not $session) {
+        Send-JsonResponse -Response $Response -Data @{
+            hasSession = $false
+            message = "No audit session available"
+        }
+        return
+    }
+
+    Send-JsonResponse -Response $Response -Data @{
+        hasSession    = $true
+        sessionId     = $session.SessionId
+        operationType = $session.OperationType
+        status        = $session.Status
+        startTime     = $session.StartTimestamp
+        endTime       = $session.EndTimestamp
+        duration      = $session.Duration
+        scanScope     = $session.ScanScope
+        userPrincipal = $session.UserPrincipal
+        errorCount    = $session.ErrorCount
+        eventCount    = $session.Events.Count
+        outputFiles   = @($session.OutputFiles)
+        metrics       = $session.Metrics
     }
 }
 
