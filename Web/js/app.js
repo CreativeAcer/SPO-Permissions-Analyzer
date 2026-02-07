@@ -457,16 +457,23 @@ function renderExternalDeepDive(container, allUsers) {
     });
 
     const editAccess = data.filter(u => ['Edit', 'Contribute', 'Full Control'].includes(u.Permission)).length;
+    const enrichedCount = data.filter(u => u.GraphEnriched).length;
 
     container.innerHTML = `
         <div class="dd-stats">
             <div class="dd-stat"><span class="dd-stat-value" style="color:#C62828">${data.length}</span><span class="dd-stat-label">External Users</span></div>
             <div class="dd-stat"><span class="dd-stat-value">${Object.keys(domains).length}</span><span class="dd-stat-label">Domains</span></div>
             <div class="dd-stat"><span class="dd-stat-value" style="color:#DC3545">${editAccess}</span><span class="dd-stat-label">With Edit+</span></div>
+            <div class="dd-stat"><span class="dd-stat-value" style="color:#0078D4">${enrichedCount}</span><span class="dd-stat-label">Enriched</span></div>
         </div>
         ${editAccess > 0 ? '<div class="finding high"><h4>External Users with Edit Access</h4><p>' + editAccess + ' external user(s) have edit or higher permissions. Review and restrict where possible.</p></div>' : ''}
-        <div class="dd-filter-bar"><input type="text" placeholder="Search external users..." id="dd-search"><button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button></div>
-        <table><thead><tr><th>Name</th><th>Email</th><th>Domain</th><th>Permission</th></tr></thead>
+        <div id="enrichment-banner" style="margin-bottom:12px"></div>
+        <div class="dd-filter-bar">
+            <input type="text" placeholder="Search external users..." id="dd-search">
+            <button class="btn btn-primary" id="btn-enrich" style="margin-left:8px">Enrich via Graph</button>
+            <button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button>
+        </div>
+        <table><thead><tr><th>Name</th><th>Email</th><th>Domain</th><th>Permission</th><th>Account Status</th><th>Last Sign-In</th></tr></thead>
         <tbody id="dd-ext-body">${renderExternalRows(data)}</tbody></table>`;
 
     document.getElementById('dd-search').addEventListener('input', (e) => {
@@ -474,13 +481,71 @@ function renderExternalDeepDive(container, allUsers) {
         const filtered = data.filter(u => (u.Name || '').toLowerCase().includes(q) || (u.Email || '').toLowerCase().includes(q));
         document.getElementById('dd-ext-body').innerHTML = renderExternalRows(filtered);
     });
+
+    document.getElementById('btn-enrich').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-enrich');
+        btn.textContent = 'Enriching...';
+        btn.classList.add('btn-disabled');
+        try {
+            const res = await API.enrichExternal();
+            if (res.success) {
+                toast(`Enriched ${res.enriched} of ${res.totalExternal} external users`, 'success');
+                // Reload external users data
+                const usersRes = await API.getData('users');
+                const newData = (usersRes.data || []).filter(u => u.Type === 'External' || u.IsExternal);
+                document.getElementById('dd-ext-body').innerHTML = renderExternalRows(newData);
+                // Show enrichment summary
+                showEnrichmentBanner();
+            } else {
+                toast(res.message || 'Enrichment failed', 'error');
+            }
+        } catch (e) {
+            toast('Enrichment failed: ' + e.message, 'error');
+        } finally {
+            btn.textContent = 'Enrich via Graph';
+            btn.classList.remove('btn-disabled');
+        }
+    });
+
+    // Show enrichment banner if already enriched
+    if (enrichedCount > 0) {
+        showEnrichmentBanner();
+    }
+}
+
+async function showEnrichmentBanner() {
+    try {
+        const summary = await API.getEnrichment();
+        const banner = document.getElementById('enrichment-banner');
+        if (!banner) return;
+
+        const findings = [];
+        if (summary.disabledAccounts > 0) {
+            findings.push(`<div class="finding high"><h4>${summary.disabledAccounts} disabled account(s) with access</h4><p>These accounts are disabled in Azure AD but still have SharePoint permissions. Remove their access.</p></div>`);
+        }
+        if (summary.staleAccounts > 0) {
+            findings.push(`<div class="finding medium"><h4>${summary.staleAccounts} stale external account(s)</h4><p>No sign-in activity in 90+ days. Consider removing access for inactive external users.</p></div>`);
+        }
+        if (summary.enrichedCount > 0 && findings.length === 0) {
+            findings.push(`<div class="finding low"><h4>External access looks healthy</h4><p>${summary.enrichedCount} external user(s) enriched. No disabled or stale accounts detected.</p></div>`);
+        }
+        banner.innerHTML = findings.join('');
+    } catch (e) {
+        // Non-critical, ignore
+    }
 }
 
 function renderExternalRows(data) {
     return data.map(u => {
         const email = u.Email || '';
         const domain = email.includes('@') ? email.split('@')[1] : 'Unknown';
-        return `<tr><td>${esc(u.Name)}</td><td>${esc(email)}</td><td>${esc(domain)}</td><td>${esc(u.Permission)}</td></tr>`;
+        const accountStatus = u.GraphEnriched
+            ? (u.GraphAccountEnabled ? '<span style="color:#28A745">Active</span>' : '<span style="color:#DC3545">Disabled</span>')
+            : '<span style="color:#999">-</span>';
+        const lastSignIn = u.GraphLastSignIn
+            ? new Date(u.GraphLastSignIn).toLocaleDateString()
+            : (u.GraphEnriched ? 'Never' : '-');
+        return `<tr><td>${esc(u.Name)}</td><td>${esc(email)}</td><td>${esc(domain)}</td><td>${esc(u.Permission)}</td><td>${accountStatus}</td><td>${lastSignIn}</td></tr>`;
     }).join('');
 }
 

@@ -54,6 +54,14 @@ const API = {
         return this.get('metrics');
     },
 
+    enrichExternal() {
+        return this.post('enrich');
+    },
+
+    getEnrichment() {
+        return this.get('enrichment');
+    },
+
     exportData(type) {
         // Returns a download, not JSON
         window.open(`/api/export/${type}`, '_blank');

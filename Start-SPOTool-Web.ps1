@@ -26,6 +26,7 @@ param(
 . "$PSScriptRoot\Functions\Core\ThrottleProtection.ps1"
 . "$PSScriptRoot\Functions\Core\Checkpoint.ps1"
 . "$PSScriptRoot\Functions\Core\JsonExport.ps1"
+. "$PSScriptRoot\Functions\Core\GraphEnrichment.ps1"
 
 # ============================================
 # 2. Load SharePoint modules (shared with WPF version)

@@ -29,6 +29,8 @@ function Invoke-ApiHandler {
             Handle-GetData -Response $Response -DataType $dataType
         }
         "/api/metrics"      { Handle-GetMetrics -Response $Response }
+        "/api/enrich"       { Handle-PostEnrich -Response $Response }
+        "/api/enrichment"   { Handle-GetEnrichment -Response $Response }
         "/api/export/*"     {
             $exportType = $Path.Replace("/api/export/", "")
             Handle-PostExport -Request $Request -Response $Response -ExportType $exportType
@@ -449,6 +451,74 @@ function Handle-PostExportJsonType {
 }
 
 # ---- Export (CSV) ----
+
+# ---- Graph Enrichment ----
+
+function Handle-PostEnrich {
+    param($Response)
+
+    try {
+        if ($script:DemoMode) {
+            # In demo mode, simulate enrichment
+            $users = Get-SharePointData -DataType "Users"
+            $external = @($users | Where-Object { $_.Type -eq "External" -or $_.IsExternal })
+            foreach ($u in $external) {
+                $u.GraphUserType = "Guest"
+                $u.GraphAccountEnabled = $true
+                $u.GraphLastSignIn = (Get-Date).AddDays(-(Get-Random -Minimum 1 -Maximum 120)).ToString("o")
+                $u.GraphCreatedDate = (Get-Date).AddDays(-(Get-Random -Minimum 30 -Maximum 365)).ToString("o")
+                $u.GraphDisplayName = $u.Name
+                $u.GraphEnriched = $true
+            }
+            Send-JsonResponse -Response $Response -Data @{
+                success       = $true
+                totalExternal = $external.Count
+                enriched      = $external.Count
+                failed        = 0
+            }
+            return
+        }
+
+        $result = Invoke-ExternalUserEnrichment
+        Send-JsonResponse -Response $Response -Data @{
+            success       = $true
+            totalExternal = $result.TotalExternal
+            enriched      = $result.Enriched
+            failed        = $result.Failed
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            message = "Enrichment failed: $($_.Exception.Message)"
+        }
+    }
+}
+
+function Handle-GetEnrichment {
+    param($Response)
+
+    try {
+        $summary = Get-EnrichmentSummary
+
+        Send-JsonResponse -Response $Response -Data @{
+            totalExternal    = $summary.TotalExternal
+            enrichedCount    = $summary.EnrichedCount
+            disabledAccounts = $summary.DisabledAccounts
+            guestUsers       = $summary.GuestUsers
+            staleAccounts    = $summary.StaleAccounts
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            totalExternal = 0
+            enrichedCount = 0
+            error         = $_.Exception.Message
+        }
+    }
+}
+
+# ---- Export ----
 
 function Handle-PostExport {
     param($Request, $Response, [string]$ExportType)
