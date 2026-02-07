@@ -56,7 +56,8 @@
                             <TextBlock Text="App Registration Requirements:" FontWeight="SemiBold" 
                                       Foreground="#0078D4" Margin="0,0,0,5"/>
                             <TextBlock Text="• Redirect URI: http://localhost" FontSize="11" Margin="0,0,0,2"/>
-                            <TextBlock Text="• API Permissions: Sites.FullControl.All, User.Read.All" FontSize="11" Margin="0,0,0,2"/>
+                            <TextBlock Text="• Graph: Sites.FullControl.All, User.Read.All, GroupMember.Read.All" FontSize="11" Margin="0,0,0,2"/>
+                            <TextBlock Text="• SharePoint: AllSites.FullControl" FontSize="11" Margin="0,0,0,2"/>
                             <TextBlock Text="• Grant admin consent for the permissions" FontSize="11" Margin="0,0,0,2"/>
                             <TextBlock Text="• Set as public client (Allow public client flows = Yes)" FontSize="11"/>
                         </StackPanel>
@@ -382,7 +383,7 @@
                         <TextBlock TextWrapping="Wrap" Margin="0,0,0,15">
                             1. Go to API permissions<LineBreak/>
                             2. Add permission > Microsoft Graph > Delegated permissions<LineBreak/>
-                            3. Add: Sites.FullControl.All, User.Read.All, Group.Read.All<LineBreak/>
+                            3. Add: Sites.FullControl.All, User.Read.All, GroupMember.Read.All<LineBreak/>
                             4. Add permission > SharePoint > Delegated permissions<LineBreak/>
                             5. Add: AllSites.FullControl<LineBreak/>
                             6. Grant admin consent for your organization

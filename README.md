@@ -148,7 +148,11 @@ You need an Azure AD App Registration to connect to SharePoint Online.
 | Microsoft Graph | Sites.FullControl.All | Delegated |
 | Microsoft Graph | User.Read.All | Delegated |
 | Microsoft Graph | GroupMember.Read.All | Delegated |
-| SharePoint | Sites.FullControl.All | Delegated |
+| SharePoint | AllSites.FullControl | Delegated |
+
+> **Why FullControl?** This is a read-only tool, but SharePoint treats reading RoleAssignments and RoleDefinitionBindings as a privileged operation. `Sites.Read.All` / `AllSites.Read` is insufficient.
+>
+> The signed-in user must also be a **SharePoint Administrator** for tenant-wide site enumeration to work.
 
 Click **Grant admin consent** after adding all permissions.
 

@@ -43,7 +43,7 @@
                 <h3>App Registration Requirements</h3>
                 <ul>
                     <li>Redirect URI set to <code>http://localhost</code></li>
-                    <li>API Permissions: Microsoft Graph &mdash; Sites.FullControl.All, User.Read.All, GroupMember.Read.All; SharePoint &mdash; Sites.FullControl.All</li>
+                    <li>API Permissions (Delegated): Microsoft Graph &mdash; Sites.FullControl.All, User.Read.All, GroupMember.Read.All; SharePoint &mdash; AllSites.FullControl</li>
                     <li>Admin consent granted for the above permissions</li>
                     <li>Authentication &rarr; Allow public client flows enabled</li>
                 </ul>
@@ -171,10 +171,10 @@
             <h3>Configure Permissions</h3>
             <p>The app registration requires the following API permissions:</p>
             <ul>
-                <li><strong>Microsoft Graph</strong> &mdash; Sites.FullControl.All (Application)</li>
-                <li><strong>Microsoft Graph</strong> &mdash; User.Read.All (Application)</li>
-                <li><strong>Microsoft Graph</strong> &mdash; GroupMember.Read.All (Application)</li>
-                <li><strong>SharePoint</strong> &mdash; Sites.FullControl.All (Application)</li>
+                <li><strong>Microsoft Graph</strong> &mdash; Sites.FullControl.All (Delegated)</li>
+                <li><strong>Microsoft Graph</strong> &mdash; User.Read.All (Delegated)</li>
+                <li><strong>Microsoft Graph</strong> &mdash; GroupMember.Read.All (Delegated)</li>
+                <li><strong>SharePoint</strong> &mdash; AllSites.FullControl (Delegated)</li>
             </ul>
             <p>After adding permissions, click <strong>Grant admin consent</strong> to approve them for your tenant.</p>
         </div>
