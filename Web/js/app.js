@@ -197,9 +197,21 @@ async function handleReport() {
         toast('Run an analysis first', 'info');
         return;
     }
-    // Trigger CSV exports
-    API.exportData('users');
-    toast('Report download started', 'info');
+
+    try {
+        // Export full governance JSON report
+        const report = await API.exportJson();
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `spo_governance_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Governance JSON report downloaded', 'success');
+    } catch (e) {
+        toast('Report generation failed: ' + e.message, 'error');
+    }
 }
 
 // --- Analytics Tab ---

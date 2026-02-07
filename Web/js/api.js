@@ -57,5 +57,15 @@ const API = {
     exportData(type) {
         // Returns a download, not JSON
         window.open(`/api/export/${type}`, '_blank');
+    },
+
+    async exportJson() {
+        // Returns full governance JSON report
+        return this.get('export-json');
+    },
+
+    async exportJsonType(type) {
+        // Returns typed JSON export
+        return this.get(`export-json/${type}`);
     }
 };

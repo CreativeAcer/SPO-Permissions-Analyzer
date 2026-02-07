@@ -33,6 +33,11 @@ function Invoke-ApiHandler {
             $exportType = $Path.Replace("/api/export/", "")
             Handle-PostExport -Request $Request -Response $Response -ExportType $exportType
         }
+        "/api/export-json"  { Handle-PostExportJson -Response $Response }
+        "/api/export-json/*" {
+            $jsonType = $Path.Replace("/api/export-json/", "")
+            Handle-PostExportJsonType -Response $Response -DataType $jsonType
+        }
         "/api/shutdown"     {
             Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Shutting down" }
             Stop-WebServer
@@ -398,7 +403,52 @@ function Handle-GetMetrics {
     }
 }
 
-# ---- Export ----
+# ---- JSON Export ----
+
+function Handle-PostExportJson {
+    param($Response)
+
+    try {
+        $report = Build-GovernanceReport -IncludeMetadata
+        Send-JsonResponse -Response $Response -Data $report
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
+    }
+}
+
+function Handle-PostExportJsonType {
+    param($Response, [string]$DataType)
+
+    try {
+        $typeMap = @{
+            "sites"           = "Sites"
+            "users"           = "Users"
+            "groups"          = "Groups"
+            "roleassignments" = "RoleAssignments"
+            "inheritance"     = "InheritanceItems"
+            "sharinglinks"    = "SharingLinks"
+        }
+
+        $mappedType = if ($typeMap.ContainsKey($DataType.ToLower())) { $typeMap[$DataType.ToLower()] } else { $DataType }
+        $data = Get-SharePointData -DataType $mappedType
+
+        $output = [ordered]@{
+            schemaVersion = "1.0.0"
+            exportedAt    = (Get-Date).ToString("o")
+            dataType      = $DataType
+            count         = @($data).Count
+            data          = @($data)
+        }
+
+        Send-JsonResponse -Response $Response -Data $output
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
+    }
+}
+
+# ---- Export (CSV) ----
 
 function Handle-PostExport {
     param($Request, $Response, [string]$ExportType)
