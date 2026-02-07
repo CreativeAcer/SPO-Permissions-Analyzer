@@ -29,5 +29,6 @@ RUN mkdir -p /app/Logs /app/Reports/Generated
 EXPOSE 8080
 
 ENV UI_MODE=web
+ENV SPO_HEADLESS=true
 
 ENTRYPOINT ["pwsh", "-File", "/app/docker-entrypoint.ps1"]

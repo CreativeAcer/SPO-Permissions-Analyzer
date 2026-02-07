@@ -48,6 +48,11 @@
                     <li>Authentication &rarr; Allow public client flows enabled</li>
                 </ul>
             </div>
+            <div id="headless-note" class="info-box hidden" style="border-left-color:#FFC107;background:#FFF8E1">
+                <h3>Container Mode</h3>
+                <p>Running in a container. Live connections use <strong>device code flow</strong>: click Connect, then check the container terminal for the authentication code. Open <code>https://microsoft.com/devicelogin</code> and enter the code to authenticate.</p>
+                <p>Alternatively, set <code>SPO_TENANT_URL</code> and <code>SPO_CLIENT_ID</code> environment variables to auto-connect on startup.</p>
+            </div>
             <div class="button-row">
                 <button id="btn-connect" class="btn btn-primary">Connect to SharePoint</button>
                 <button id="btn-demo" class="btn btn-secondary">Demo Mode</button>

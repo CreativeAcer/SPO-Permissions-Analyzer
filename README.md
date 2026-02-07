@@ -169,7 +169,19 @@ podman run -p 8080:8080 spo-analyzer
 podman compose down
 ```
 
-> **Note**: Live SharePoint connections use interactive browser auth, which is unavailable in headless containers. Use **Demo Mode** to explore all features in a container. For live SharePoint connections, run the tool directly on your host.
+### Live SharePoint Connection in Container
+
+The container uses **device code flow** for authentication (no browser popup needed):
+
+**Option 1: Auto-connect on startup** — set env vars in `compose.yaml`:
+```yaml
+environment:
+  - SPO_TENANT_URL=https://yourtenant.sharepoint.com
+  - SPO_CLIENT_ID=your-app-registration-guid
+```
+The device code appears in the container terminal. Open `https://microsoft.com/devicelogin`, enter the code, authenticate, and the web server starts already connected.
+
+**Option 2: Connect via the UI** — click "Connect to SharePoint" in the web interface. The device code appears in the container terminal (`podman logs <container>`). Authenticate at the device login URL, and the UI updates when complete.
 
 ---
 

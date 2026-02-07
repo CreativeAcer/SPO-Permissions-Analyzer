@@ -19,6 +19,10 @@ services:
       - "8080:8080"
     environment:
       - UI_MODE=web
+      - SPO_HEADLESS=true
+      # Set these to auto-connect on startup via device code flow:
+      # - SPO_TENANT_URL=https://yourtenant.sharepoint.com
+      # - SPO_CLIENT_ID=your-app-registration-guid
     restart: unless-stopped
 
   spo-local:
