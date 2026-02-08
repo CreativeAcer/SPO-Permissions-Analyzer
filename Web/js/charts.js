@@ -1,28 +1,51 @@
 // ============================================
-// charts.js - Chart.js wrappers
+// charts.js - Chart.js wrappers (Enhanced)
 // ============================================
 
 let storageChart = null;
 let permissionChart = null;
 
+// Modern color palette with gradients
 const COLORS = {
     blue: '#1976D2',
-    green: '#2E7D32',
-    orange: '#F57C00',
-    red: '#C62828',
-    purple: '#7B1FA2',
-    teal: '#00897B',
-    amber: '#F57F17',
-    grey: '#6C757D',
-    // Permission-specific
-    fullControl: '#DC3545',
-    edit: '#FFC107',
-    contribute: '#FD7E14',
-    read: '#28A745',
-    viewOnly: '#17A2B8',
-    limited: '#6C757D',
-    custom: '#6F42C1'
+    green: '#10B981',
+    orange: '#F97316',
+    red: '#EF4444',
+    purple: '#A855F7',
+    teal: '#14B8A6',
+    amber: '#F59E0B',
+    grey: '#71717A',
+    // Permission-specific (updated to modern palette)
+    fullControl: '#EF4444',
+    edit: '#F59E0B',
+    contribute: '#F97316',
+    read: '#10B981',
+    viewOnly: '#3B82F6',
+    limited: '#71717A',
+    custom: '#A855F7'
 };
+
+// Gradient definitions for charts
+const GRADIENTS = {
+    blue: ['#3B82F6', '#2563EB'],
+    green: ['#10B981', '#059669'],
+    orange: ['#F97316', '#EA580C'],
+    red: ['#EF4444', '#DC2626'],
+    purple: ['#A855F7', '#9333EA'],
+    amber: ['#F59E0B', '#D97706']
+};
+
+// Chart.js default configuration
+Chart.defaults.font.family = "'Segoe UI', -apple-system, system-ui, 'Inter', sans-serif";
+Chart.defaults.font.size = 13;
+Chart.defaults.color = '#52525B';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 12;
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(24, 24, 27, 0.95)';
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+Chart.defaults.plugins.tooltip.padding = 12;
+Chart.defaults.plugins.tooltip.titleFont.weight = '600';
+Chart.defaults.plugins.tooltip.bodyFont.size = 13;
 
 function renderStorageChart(sites) {
     const canvas = document.getElementById('chart-storage');
@@ -33,8 +56,17 @@ function renderStorageChart(sites) {
     if (!sites || sites.length === 0) {
         storageChart = new Chart(canvas, {
             type: 'bar',
-            data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: '#E1DFDD' }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: '#E5E7EB' }] },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#F3F4F6' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
         });
         return;
     }
@@ -45,11 +77,24 @@ function renderStorageChart(sites) {
         .sort((a, b) => b.storage - a.storage)
         .slice(0, 10);
 
+    // Create gradient colors
+    const ctx = canvas.getContext('2d');
     const colors = sorted.map(s => {
-        if (s.storage >= 1500) return COLORS.purple;
-        if (s.storage >= 1000) return COLORS.red;
-        if (s.storage >= 500) return COLORS.orange;
-        return COLORS.green;
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        if (s.storage >= 1500) {
+            gradient.addColorStop(0, GRADIENTS.purple[0]);
+            gradient.addColorStop(1, GRADIENTS.purple[1]);
+        } else if (s.storage >= 1000) {
+            gradient.addColorStop(0, GRADIENTS.red[0]);
+            gradient.addColorStop(1, GRADIENTS.red[1]);
+        } else if (s.storage >= 500) {
+            gradient.addColorStop(0, GRADIENTS.orange[0]);
+            gradient.addColorStop(1, GRADIENTS.orange[1]);
+        } else {
+            gradient.addColorStop(0, GRADIENTS.green[0]);
+            gradient.addColorStop(1, GRADIENTS.green[1]);
+        }
+        return gradient;
     });
 
     storageChart = new Chart(canvas, {
@@ -60,23 +105,50 @@ function renderStorageChart(sites) {
                 label: 'Storage (MB)',
                 data: sorted.map(s => s.storage),
                 backgroundColor: colors,
-                borderRadius: 4
+                borderRadius: 8,
+                borderSkipped: false
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 800,
+                easing: 'easeOutQuart'
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: ctx => `${ctx.parsed.y} MB`
+                        label: ctx => `Storage: ${ctx.parsed.y} MB`,
+                        title: ctx => sorted[ctx[0].dataIndex].title
                     }
                 }
             },
             scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'MB' } },
-                x: { ticks: { maxRotation: 45 } }
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#F3F4F6',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        callback: value => `${value} MB`,
+                        padding: 8
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0,
+                        padding: 8
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
             }
         }
     });
@@ -95,8 +167,15 @@ function renderPermissionChart(users, groups) {
     if (allItems.length === 0) {
         permissionChart = new Chart(canvas, {
             type: 'doughnut',
-            data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#E1DFDD'] }] },
-            options: { plugins: { legend: { position: 'right' } } }
+            data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
+            options: {
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { padding: 12 }
+                    }
+                }
+            }
         });
         return;
     }
@@ -128,19 +207,64 @@ function renderPermissionChart(users, groups) {
             datasets: [{
                 data,
                 backgroundColor: bgColors,
-                borderWidth: 2,
-                borderColor: '#fff'
+                borderWidth: 3,
+                borderColor: '#fff',
+                hoverBorderWidth: 4,
+                hoverOffset: 8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart',
+                animateRotate: true,
+                animateScale: true
+            },
             plugins: {
                 legend: {
                     position: 'right',
-                    labels: { font: { size: 11 }, padding: 8 }
+                    labels: {
+                        padding: 12,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        font: {
+                            size: 12,
+                            weight: '500'
+                        },
+                        generateLabels: (chart) => {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return {
+                                        text: `${label} (${percentage}%)`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: false,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const label = ctx.label || '';
+                            const value = ctx.parsed;
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
                 }
-            }
+            },
+            cutout: '60%'
         }
     });
 }
@@ -156,21 +280,60 @@ function renderDeepDiveChart(canvasId, type, data) {
     if (!data || data.length === 0) return;
 
     if (type === 'bar') {
+        // Create gradients for bar chart
+        const ctx = canvas.getContext('2d');
+        const gradients = data.map(d => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            const color = d.color || COLORS.blue;
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, color + 'CC'); // Add transparency
+            return gradient;
+        });
+
         new Chart(canvas, {
             type: 'bar',
             data: {
                 labels: data.map(d => d.label),
                 datasets: [{
                     data: data.map(d => d.value),
-                    backgroundColor: data.map(d => d.color || COLORS.blue),
-                    borderRadius: 4
+                    backgroundColor: gradients,
+                    borderRadius: 8,
+                    borderSkipped: false
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
+                animation: {
+                    duration: 800,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.label}: ${ctx.parsed.y}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#F3F4F6',
+                            drawBorder: false
+                        },
+                        ticks: { padding: 8 }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { padding: 8 }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
             }
         });
     } else if (type === 'doughnut') {
@@ -181,14 +344,64 @@ function renderDeepDiveChart(canvasId, type, data) {
                 datasets: [{
                     data: data.map(d => d.value),
                     backgroundColor: data.map(d => d.color || COLORS.blue),
-                    borderWidth: 2,
-                    borderColor: '#fff'
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    hoverBorderWidth: 4,
+                    hoverOffset: 8
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } }
+                animation: {
+                    duration: 1000,
+                    easing: 'easeOutQuart',
+                    animateRotate: true,
+                    animateScale: true
+                },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 12,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            },
+                            generateLabels: (chart) => {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    return data.labels.map((label, i) => {
+                                        const value = data.datasets[0].data[i];
+                                        const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((value / total) * 100).toFixed(1);
+                                        return {
+                                            text: `${label} (${percentage}%)`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const label = ctx.label || '';
+                                const value = ctx.parsed;
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
             }
         });
     }

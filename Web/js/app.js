@@ -244,16 +244,34 @@ function initAnalytics() {
 
 async function refreshAnalytics() {
     try {
+        // Show skeleton loaders if UIHelpers available
+        if (typeof UIHelpers !== 'undefined') {
+            UIHelpers.showMetricSkeletons();
+        }
+
         const metrics = await API.getMetrics();
 
-        // Update metric cards
-        setText('metric-sites', metrics.totalSites);
-        setText('metric-users', metrics.totalUsers);
-        setText('metric-groups', metrics.totalGroups);
-        setText('metric-external', metrics.externalUsers);
-        setText('metric-roles', metrics.totalRoleAssignments);
-        setText('metric-inheritance', metrics.inheritanceBreaks);
-        setText('metric-sharing', metrics.totalSharingLinks);
+        // Update metric cards with animation if available
+        const metricMap = {
+            'metric-sites': metrics.totalSites,
+            'metric-users': metrics.totalUsers,
+            'metric-groups': metrics.totalGroups,
+            'metric-external': metrics.externalUsers,
+            'metric-roles': metrics.totalRoleAssignments,
+            'metric-inheritance': metrics.inheritanceBreaks,
+            'metric-sharing': metrics.totalSharingLinks
+        };
+
+        // Animate counters if UIHelpers available, otherwise just set text
+        if (typeof UIHelpers !== 'undefined') {
+            Object.entries(metricMap).forEach(([id, value]) => {
+                UIHelpers.animateCounter(id, value, 800);
+            });
+        } else {
+            Object.entries(metricMap).forEach(([id, value]) => {
+                setText(id, value);
+            });
+        }
 
         setText('analytics-subtitle', `Last updated: ${new Date().toLocaleString()}`);
 
@@ -881,15 +899,21 @@ function formatStorage(mb) {
 }
 
 function setButtonLoading(id, loading) {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    if (loading) {
-        btn.dataset.originalText = btn.textContent;
-        btn.textContent = 'Loading...';
-        btn.classList.add('btn-disabled');
+    // Use UIHelpers if available for modern loading spinner
+    if (typeof UIHelpers !== 'undefined') {
+        UIHelpers.setButtonLoading(id, loading);
     } else {
-        btn.textContent = btn.dataset.originalText || btn.textContent;
-        btn.classList.remove('btn-disabled');
+        // Fallback to text-based loading
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        if (loading) {
+            btn.dataset.originalText = btn.textContent;
+            btn.textContent = 'Loading...';
+            btn.classList.add('btn-disabled');
+        } else {
+            btn.textContent = btn.dataset.originalText || btn.textContent;
+            btn.classList.remove('btn-disabled');
+        }
     }
 }
 
