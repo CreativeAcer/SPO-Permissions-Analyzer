@@ -32,16 +32,19 @@ function Start-WebServer {
     $listener = [System.Net.HttpListener]::new()
     $listener.Prefixes.Add($prefix)
 
-    # Shared operation state - accessible from API handlers
-    $script:ServerState = @{
-        Listener     = $listener
-        WebRoot      = $webRoot
-        Port         = $Port
-        Running      = $true
-        OperationLog = [System.Collections.ArrayList]::new()
+    # Shared operation state - synchronized for thread-safe access from background runspaces
+    $script:ServerState = [hashtable]::Synchronized(@{
+        Listener         = $listener
+        WebRoot          = $webRoot
+        Port             = $Port
+        Running          = $true
+        OperationLog     = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())
         OperationRunning = $false
         OperationComplete = $true
-    }
+        OperationError   = $null
+        BackgroundJob    = $null
+        SharePointData   = $script:SharePointData
+    })
 
     try {
         $listener.Start()
@@ -73,11 +76,19 @@ function Start-WebServer {
 
         Write-ActivityLog "Web server started on port $Port" -Level "Information"
 
-        # Main request loop
+        # Main request loop - uses async GetContext so we can service requests
+        # while background operations (permissions analysis, site fetching) are running
         while ($script:ServerState.Running -and $listener.IsListening) {
             try {
-                $context = $listener.GetContext()
-                Invoke-RequestHandler -Context $context
+                $asyncResult = $listener.BeginGetContext($null, $null)
+                # Wait up to 500ms for a request, then loop to check Running flag
+                while (-not $asyncResult.AsyncWaitHandle.WaitOne(500)) {
+                    if (-not $script:ServerState.Running -or -not $listener.IsListening) { break }
+                }
+                if ($asyncResult.IsCompleted -and $script:ServerState.Running -and $listener.IsListening) {
+                    $context = $listener.EndGetContext($asyncResult)
+                    Invoke-RequestHandler -Context $context
+                }
             }
             catch [System.Net.HttpListenerException] {
                 if ($script:ServerState.Running) {
@@ -237,6 +248,112 @@ function Add-OperationLog {
     )
 
     [void]$script:ServerState.OperationLog.Add($Message)
+}
+
+function Start-BackgroundOperation {
+    <#
+    .SYNOPSIS
+    Runs a long-running operation in a background runspace so the HTTP server stays responsive.
+    The scriptblock receives $SharedState (synchronized hashtable) and $ScriptRoot (project root).
+    All core modules are dot-sourced into the new runspace and the PnP connection is re-established
+    via access token forwarding.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock]$ScriptBlock
+    )
+
+    # Capture the PnP access token from the current session so the background runspace
+    # can re-connect without an interactive prompt
+    $accessToken = $null
+    $tenantUrl = $null
+    try {
+        $accessToken = Get-PnPAccessToken -ErrorAction SilentlyContinue
+        $tenantUrl = (Get-AppSetting -SettingName "SharePoint.TenantUrl")
+    } catch { }
+
+    $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
+    # Prepare initial session state with required variables
+    $iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+
+    $ps = [PowerShell]::Create()
+    $ps.Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($iss)
+    $ps.Runspace.Open()
+
+    # Pass shared state and project root into the runspace
+    $ps.Runspace.SessionStateProxy.SetVariable('SharedState', $script:ServerState)
+    $ps.Runspace.SessionStateProxy.SetVariable('ScriptRoot', $projectRoot)
+    $ps.Runspace.SessionStateProxy.SetVariable('AccessToken', $accessToken)
+    $ps.Runspace.SessionStateProxy.SetVariable('TenantUrl', $tenantUrl)
+
+    # The wrapper script loads all modules, re-establishes PnP connection, then runs the operation
+    $wrapperScript = {
+        param($OperationScript)
+
+        # Dot-source all core and SharePoint modules
+        . "$ScriptRoot\Functions\Core\Logging.ps1"
+        . "$ScriptRoot\Functions\Core\Settings.ps1"
+        . "$ScriptRoot\Functions\Core\SharePointDataManager.ps1"
+        . "$ScriptRoot\Functions\Core\ThrottleProtection.ps1"
+        . "$ScriptRoot\Functions\Core\Checkpoint.ps1"
+        . "$ScriptRoot\Functions\Core\JsonExport.ps1"
+        . "$ScriptRoot\Functions\Core\GraphEnrichment.ps1"
+        . "$ScriptRoot\Functions\Core\RiskScoring.ps1"
+        . "$ScriptRoot\Functions\Core\AuditLog.ps1"
+        . "$ScriptRoot\Functions\SharePoint\SPOConnection.ps1"
+        . "$ScriptRoot\Functions\UI\OperationsTab.ps1"
+        . "$ScriptRoot\Functions\Server\WebServer.ps1"
+
+        # Override Write-ConsoleOutput to write to the shared operation log
+        function Write-ConsoleOutput {
+            param(
+                [string]$Message,
+                [switch]$Append,
+                [switch]$NewLine = $true,
+                [switch]$ForceUpdate
+            )
+            [void]$SharedState.OperationLog.Add($Message)
+        }
+
+        # Override Update-UIAndWait - no-op in background
+        function Update-UIAndWait {
+            param([int]$WaitMs = 0)
+        }
+
+        # Point the data manager at the SAME synchronized data store from the main runspace
+        # This is safe because SharedState is a synchronized hashtable
+        $script:SharePointData = $SharedState.SharePointData
+
+        # Re-establish PnP connection in this runspace using the forwarded access token
+        if ($AccessToken -and $TenantUrl) {
+            try {
+                Connect-PnPOnline -Url $TenantUrl -AccessToken $AccessToken -ErrorAction Stop
+            } catch {
+                [void]$SharedState.OperationLog.Add("Warning: Could not re-establish PnP connection in background: $($_.Exception.Message)")
+            }
+        }
+
+        try {
+            $SharedState.OperationRunning = $true
+            $SharedState.OperationComplete = $false
+
+            # Execute the actual operation
+            & $OperationScript
+
+            $SharedState.OperationRunning = $false
+            $SharedState.OperationComplete = $true
+        }
+        catch {
+            [void]$SharedState.OperationLog.Add("Error: $($_.Exception.Message)")
+            $SharedState.OperationRunning = $false
+            $SharedState.OperationComplete = $true
+            $SharedState.OperationError = $_.Exception.Message
+        }
+    }
+
+    [void]$ps.AddScript($wrapperScript).AddArgument($ScriptBlock)
+    $script:ServerState.BackgroundJob = $ps.BeginInvoke()
 }
 
 function Stop-WebServer {

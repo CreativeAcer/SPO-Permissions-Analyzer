@@ -291,23 +291,27 @@ function Handle-PostSites {
         return
     }
 
-    try {
-        if ($script:DemoMode) {
-            Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Sites already loaded in demo mode" }
-            return
-        }
+    if ($script:DemoMode) {
+        Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Sites already loaded in demo mode" }
+        return
+    }
 
-        # Use existing real sites function logic
-        $script:ServerState.OperationLog.Clear()
-        Add-OperationLog "Fetching sites..."
+    if ($script:ServerState.OperationRunning) {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Another operation is already running" } -StatusCode 409
+        return
+    }
+
+    # Launch in background so the server stays responsive for progress polling
+    $script:ServerState.OperationLog.Clear()
+    $script:ServerState.OperationError = $null
+    [void]$script:ServerState.OperationLog.Add("Fetching sites...")
+
+    Start-BackgroundOperation -ScriptBlock {
         Get-RealSites-DataDriven
-        Add-OperationLog "Sites loaded successfully"
+        [void]$SharedState.OperationLog.Add("Sites loaded successfully")
+    }
 
-        Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Sites retrieved" }
-    }
-    catch {
-        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
-    }
+    Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Site retrieval started" }
 }
 
 # ---- Permissions Analysis ----
@@ -323,34 +327,31 @@ function Handle-PostPermissions {
     $body = Read-RequestBody -Request $Request
     $siteUrl = if ($body -and $body.siteUrl) { $body.siteUrl } else { "" }
 
-    try {
-        $script:ServerState.OperationLog.Clear()
-        $script:ServerState.OperationRunning = $true
-        $script:ServerState.OperationComplete = $false
+    if ($script:DemoMode) {
+        $script:ServerState.OperationRunning = $false
+        $script:ServerState.OperationComplete = $true
+        Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Permissions available from demo data" }
+        return
+    }
 
-        if ($script:DemoMode) {
-            Add-OperationLog "Permissions data already loaded in demo mode."
-            $script:ServerState.OperationRunning = $false
-            $script:ServerState.OperationComplete = $true
-            Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Permissions available from demo data" }
-            return
-        }
+    if ($script:ServerState.OperationRunning) {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Another operation is already running" } -StatusCode 409
+        return
+    }
 
-        # Run real analysis - this is synchronous and may take a while
-        Add-OperationLog "Starting permissions analysis..."
+    # Launch in background so the server stays responsive for progress polling
+    $script:ServerState.OperationLog.Clear()
+    $script:ServerState.OperationError = $null
+    $script:ServerState.OperationSiteUrl = $siteUrl
+    [void]$script:ServerState.OperationLog.Add("Starting permissions analysis...")
+
+    Start-BackgroundOperation -ScriptBlock {
+        $siteUrl = $SharedState.OperationSiteUrl
         Get-RealPermissions-DataDriven -SiteUrl $siteUrl
-        Add-OperationLog "Analysis complete."
-
-        $script:ServerState.OperationRunning = $false
-        $script:ServerState.OperationComplete = $true
-
-        Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Permissions analysis complete" }
+        [void]$SharedState.OperationLog.Add("Analysis complete.")
     }
-    catch {
-        $script:ServerState.OperationRunning = $false
-        $script:ServerState.OperationComplete = $true
-        Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
-    }
+
+    Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Permissions analysis started" }
 }
 
 # ---- Progress ----
@@ -358,11 +359,23 @@ function Handle-PostPermissions {
 function Handle-GetProgress {
     param($Response)
 
-    Send-JsonResponse -Response $Response -Data @{
+    $data = @{
         messages = @($script:ServerState.OperationLog.ToArray())
-        running = $script:ServerState.OperationRunning
+        running  = $script:ServerState.OperationRunning
         complete = $script:ServerState.OperationComplete
     }
+
+    # Include error if the background operation failed
+    if ($script:ServerState.OperationError) {
+        $data.error = $script:ServerState.OperationError
+    }
+
+    # Include enrichment result if available
+    if ($script:ServerState.EnrichmentResult) {
+        $data.enrichmentResult = $script:ServerState.EnrichmentResult
+    }
+
+    Send-JsonResponse -Response $Response -Data $data
 }
 
 # ---- Data ----
@@ -457,9 +470,9 @@ function Handle-PostExportJsonType {
 function Handle-PostEnrich {
     param($Response)
 
-    try {
-        if ($script:DemoMode) {
-            # In demo mode, simulate enrichment
+    if ($script:DemoMode) {
+        # In demo mode, simulate enrichment synchronously (fast, no PnP calls)
+        try {
             $users = Get-SharePointData -DataType "Users"
             $external = @($users | Where-Object { $_.Type -eq "External" -or $_.IsExternal })
             foreach ($u in $external) {
@@ -476,23 +489,38 @@ function Handle-PostEnrich {
                 enriched      = $external.Count
                 failed        = 0
             }
-            return
         }
+        catch {
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                message = "Enrichment failed: $($_.Exception.Message)"
+            }
+        }
+        return
+    }
 
+    if ($script:ServerState.OperationRunning) {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Another operation is already running" } -StatusCode 409
+        return
+    }
+
+    # Launch in background so the server stays responsive for progress polling
+    $script:ServerState.OperationLog.Clear()
+    $script:ServerState.OperationError = $null
+    [void]$script:ServerState.OperationLog.Add("Starting external user enrichment...")
+
+    Start-BackgroundOperation -ScriptBlock {
         $result = Invoke-ExternalUserEnrichment
-        Send-JsonResponse -Response $Response -Data @{
-            success       = $true
-            totalExternal = $result.TotalExternal
-            enriched      = $result.Enriched
-            failed        = $result.Failed
+        [void]$SharedState.OperationLog.Add("Enrichment complete: $($result.Enriched) of $($result.TotalExternal) enriched")
+        # Store result for the progress endpoint to pick up
+        $SharedState.EnrichmentResult = @{
+            TotalExternal = $result.TotalExternal
+            Enriched      = $result.Enriched
+            Failed        = $result.Failed
         }
     }
-    catch {
-        Send-JsonResponse -Response $Response -Data @{
-            success = $false
-            message = "Enrichment failed: $($_.Exception.Message)"
-        }
-    }
+
+    Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Enrichment started" }
 }
 
 function Handle-GetEnrichment {

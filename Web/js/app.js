@@ -139,19 +139,28 @@ async function handleGetSites() {
 
     try {
         const res = await API.getSites();
-        if (res.success) {
-            const sites = await API.getData('sites');
-            const siteList = sites.data || [];
-            console_.textContent += `\nRetrieved ${siteList.length} sites:\n`;
-            siteList.forEach((s, i) => {
-                console_.textContent += `\n${i + 1}. ${s.Title || 'Unknown'}\n   URL: ${s.Url || 'N/A'}\n   Owner: ${s.Owner || 'N/A'}\n   Storage: ${s.Storage || '0'} MB\n`;
-            });
-            await refreshAnalytics();
-            await showAuditSummary(console_);
-            toast(`Retrieved ${siteList.length} sites`, 'success');
-        } else {
+        if (res.started) {
+            // Background operation — poll until complete
+            const progress = await pollUntilComplete(console_);
+            if (progress.error) {
+                console_.textContent += `\nError: ${progress.error}`;
+                toast('Site retrieval failed', 'error');
+                return;
+            }
+        } else if (!res.success) {
             console_.textContent += `\nError: ${res.message}`;
+            return;
         }
+
+        const sites = await API.getData('sites');
+        const siteList = sites.data || [];
+        console_.textContent += `\nRetrieved ${siteList.length} sites:\n`;
+        siteList.forEach((s, i) => {
+            console_.textContent += `\n${i + 1}. ${s.Title || 'Unknown'}\n   URL: ${s.Url || 'N/A'}\n   Owner: ${s.Owner || 'N/A'}\n   Storage: ${s.Storage || '0'} MB\n`;
+        });
+        await refreshAnalytics();
+        await showAuditSummary(console_);
+        toast(`Retrieved ${siteList.length} sites`, 'success');
     } catch (e) {
         console_.textContent += `\nError: ${e.message}`;
     } finally {
@@ -167,26 +176,29 @@ async function handleAnalyze() {
 
     try {
         const res = await API.analyzePermissions(siteUrl);
-        // Fetch progress log
-        const progress = await API.getProgress();
-        if (progress.messages) {
-            console_.textContent = progress.messages.join('\n');
+        if (res.started) {
+            // Background operation — poll until complete
+            const progress = await pollUntilComplete(console_);
+            if (progress.error) {
+                console_.textContent += `\nError: ${progress.error}`;
+                toast('Permissions analysis failed', 'error');
+                return;
+            }
+        } else if (!res.success) {
+            console_.textContent += `\nError: ${res.message}`;
+            return;
         }
 
-        if (res.success) {
-            appState.dataLoaded = true;
-            // Append final metrics
-            const metrics = await API.getMetrics();
-            console_.textContent += '\n\n=== ANALYSIS COMPLETE ===';
-            console_.textContent += `\nUsers: ${metrics.totalUsers} | Groups: ${metrics.totalGroups} | External: ${metrics.externalUsers}`;
-            console_.textContent += `\nRole Assignments: ${metrics.totalRoleAssignments} | Inheritance Breaks: ${metrics.inheritanceBreaks} | Sharing Links: ${metrics.totalSharingLinks}`;
-            console_.textContent += '\n\nSwitch to Visual Analytics tab for charts and deep dives.';
-            await refreshAnalytics();
-            await showAuditSummary(console_);
-            toast('Permissions analysis complete', 'success');
-        } else {
-            console_.textContent += `\nError: ${res.message}`;
-        }
+        appState.dataLoaded = true;
+        // Append final metrics
+        const metrics = await API.getMetrics();
+        console_.textContent += '\n\n=== ANALYSIS COMPLETE ===';
+        console_.textContent += `\nUsers: ${metrics.totalUsers} | Groups: ${metrics.totalGroups} | External: ${metrics.externalUsers}`;
+        console_.textContent += `\nRole Assignments: ${metrics.totalRoleAssignments} | Inheritance Breaks: ${metrics.inheritanceBreaks} | Sharing Links: ${metrics.totalSharingLinks}`;
+        console_.textContent += '\n\nSwitch to Visual Analytics tab for charts and deep dives.';
+        await refreshAnalytics();
+        await showAuditSummary(console_);
+        toast('Permissions analysis complete', 'success');
     } catch (e) {
         console_.textContent += `\nError: ${e.message}`;
     } finally {
@@ -566,17 +578,28 @@ function renderExternalDeepDive(container, allUsers) {
         btn.classList.add('btn-disabled');
         try {
             const res = await API.enrichExternal();
-            if (res.success) {
+            if (res.started) {
+                // Background operation — poll until complete
+                const dummyConsole = document.createElement('div');
+                const progress = await pollUntilComplete(dummyConsole);
+                if (progress.error) {
+                    toast('Enrichment failed: ' + progress.error, 'error');
+                    return;
+                }
+                const result = progress.enrichmentResult || {};
+                toast(`Enriched ${result.Enriched || 0} of ${result.TotalExternal || 0} external users`, 'success');
+            } else if (res.success) {
                 toast(`Enriched ${res.enriched} of ${res.totalExternal} external users`, 'success');
-                // Reload external users data
-                const usersRes = await API.getData('users');
-                const newData = (usersRes.data || []).filter(u => u.Type === 'External' || u.IsExternal);
-                document.getElementById('dd-ext-body').innerHTML = renderExternalRows(newData);
-                // Show enrichment summary
-                showEnrichmentBanner();
             } else {
                 toast(res.message || 'Enrichment failed', 'error');
+                return;
             }
+            // Reload external users data
+            const usersRes = await API.getData('users');
+            const newData = (usersRes.data || []).filter(u => u.Type === 'External' || u.IsExternal);
+            document.getElementById('dd-ext-body').innerHTML = renderExternalRows(newData);
+            // Show enrichment summary
+            showEnrichmentBanner();
         } catch (e) {
             toast('Enrichment failed: ' + e.message, 'error');
         } finally {
@@ -899,6 +922,25 @@ async function showAuditSummary(console_) {
         console_.textContent += '\n(Full audit log saved to ./Logs/)';
     } catch (e) {
         // Audit info is supplementary, don't fail the operation
+    }
+}
+
+// --- Operation polling helper ---
+// Polls /api/progress until the operation is complete, updating the console element.
+async function pollUntilComplete(consoleEl, intervalMs = 1000) {
+    while (true) {
+        await new Promise(r => setTimeout(r, intervalMs));
+        try {
+            const progress = await API.getProgress();
+            if (progress.messages) {
+                consoleEl.textContent = progress.messages.join('\n');
+            }
+            if (!progress.running && progress.complete) {
+                return progress;
+            }
+        } catch (e) {
+            // Transient fetch failure — keep polling
+        }
     }
 }
 
