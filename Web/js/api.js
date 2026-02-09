@@ -88,5 +88,12 @@ const API = {
     async exportJsonType(type) {
         // Returns typed JSON export
         return this.get(`export-json/${type}`);
+    },
+
+    buildPermissionsMatrix(siteUrl, scanType) {
+        return this.post('build-permissions-matrix', {
+            siteUrl: siteUrl,
+            scanType: scanType
+        });
     }
 };

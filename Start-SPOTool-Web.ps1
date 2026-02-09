@@ -34,6 +34,7 @@ param(
 # 2. Load SharePoint modules (shared with WPF version)
 # ============================================
 . "$PSScriptRoot\Functions\SharePoint\SPOConnection.ps1"
+. "$PSScriptRoot\Functions\SharePoint\PermissionsMatrix.ps1"
 
 # ============================================
 # 3. Load Web Server modules (contains all data collection logic)

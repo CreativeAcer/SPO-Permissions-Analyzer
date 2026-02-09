@@ -42,6 +42,7 @@ function Invoke-ApiHandler {
             Handle-PostExportJsonType -Response $Response -DataType $jsonType
         }
         "/api/audit"        { Handle-GetAudit -Response $Response }
+        "/api/build-permissions-matrix" { Handle-PostBuildPermissionsMatrix -Request $Request -Response $Response }
         "/api/shutdown"     {
             Send-JsonResponse -Response $Response -Data @{ success = $true; message = "Shutting down" }
             Stop-WebServer
@@ -718,5 +719,229 @@ function Handle-PostExport {
     }
     catch {
         Send-JsonResponse -Response $Response -Data @{ success = $false; message = $_.Exception.Message }
+    }
+}
+
+function Handle-PostBuildPermissionsMatrix {
+    <#
+    .SYNOPSIS
+    Builds a permissions matrix for a SharePoint site
+    #>
+    param(
+        [System.Net.HttpListenerRequest]$Request,
+        [System.Net.HttpListenerResponse]$Response
+    )
+
+    try {
+        $body = Read-RequestBody -Request $Request
+        $siteUrl = $body.siteUrl
+        $scanType = $body.scanType
+
+        if (-not $siteUrl) {
+            Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Site URL required" } -StatusCode 400
+            return
+        }
+
+        Write-ActivityLog "Building permissions matrix for site: $siteUrl (type: $scanType)"
+
+        # Verify we're connected
+        if (-not $script:SPOConnected -and -not $script:DemoMode) {
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                message = "Not connected to SharePoint. Connect first or use Demo Mode."
+            } -StatusCode 400
+            return
+        }
+
+        # Demo mode - generate sample data
+        if ($script:DemoMode) {
+            Write-ActivityLog "Generating demo permissions matrix data"
+            $matrix = Get-DemoPermissionsMatrix -SiteUrl $siteUrl -ScanType $scanType
+            Send-JsonResponse -Response $Response -Data @{
+                success = $true
+                data = $matrix
+            }
+            return
+        }
+
+        # Live mode - connect to the specific site
+        try {
+            $currentConnection = Get-PnPConnection -ErrorAction SilentlyContinue
+            if ($currentConnection) {
+                $accessToken = Get-PnPAccessToken
+                Connect-PnPOnline -Url $siteUrl -AccessToken $accessToken -WarningAction SilentlyContinue
+            } else {
+                throw "No active PnP connection"
+            }
+        } catch {
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                message = "Failed to connect to site: $($_.Exception.Message)"
+            } -StatusCode 500
+            return
+        }
+
+        # Build the permissions matrix
+        try {
+            $matrix = Get-SitePermissionsMatrix -SiteUrl $siteUrl -ScanType $scanType
+
+            Send-JsonResponse -Response $Response -Data @{
+                success = $true
+                data = $matrix
+            }
+        } catch {
+            Write-ActivityLog "Matrix build error: $($_.Exception.Message)" -Level "Error"
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                message = $_.Exception.Message
+            } -StatusCode 500
+        }
+
+    } catch {
+        Write-ActivityLog "Matrix build error: $($_.Exception.Message)" -Level "Error"
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            message = $_.Exception.Message
+        } -StatusCode 500
+    }
+}
+
+function Get-DemoPermissionsMatrix {
+    <#
+    .SYNOPSIS
+    Generates demo permissions matrix data
+    #>
+    param(
+        [string]$SiteUrl,
+        [string]$ScanType = 'quick'
+    )
+
+    $siteName = if ($SiteUrl -match '/sites/(.+)$') { $matches[1] } else { 'Demo Site' }
+
+    # Build a realistic permissions tree
+    $tree = @(
+        @{
+            title = $siteName
+            type = 'Site'
+            url = $SiteUrl
+            permissions = @(
+                @{ principal = 'Site Owners'; role = 'Full Control' }
+                @{ principal = 'Site Members'; role = 'Edit' }
+                @{ principal = 'Site Visitors'; role = 'Read' }
+            )
+            children = @(
+                @{
+                    title = 'Documents'
+                    type = 'Library'
+                    url = "$SiteUrl/Shared Documents"
+                    permissions = @()
+                    children = @(
+                        @{
+                            title = 'Projects'
+                            type = 'Folder'
+                            url = "$SiteUrl/Shared Documents/Projects"
+                            permissions = @(
+                                @{ principal = 'Project Team'; role = 'Edit' }
+                                @{ principal = 'external_consultant@partner.com'; role = 'Read' }
+                            )
+                        }
+                        @{
+                            title = 'Confidential Budget 2024.xlsx'
+                            type = 'File'
+                            url = "$SiteUrl/Shared Documents/Confidential Budget 2024.xlsx"
+                            permissions = @(
+                                @{ principal = 'Finance Team'; role = 'Full Control' }
+                            )
+                        }
+                        @{
+                            title = 'Team Handbook.docx'
+                            type = 'File'
+                            url = "$SiteUrl/Shared Documents/Team Handbook.docx"
+                            permissions = @()
+                        }
+                    )
+                }
+                @{
+                    title = 'HR Documents'
+                    type = 'Library'
+                    url = "$SiteUrl/HR Documents"
+                    permissions = @(
+                        @{ principal = 'HR Team'; role = 'Full Control' }
+                        @{ principal = 'All Employees'; role = 'Read' }
+                    )
+                    children = @(
+                        @{
+                            title = 'Policies'
+                            type = 'Folder'
+                            url = "$SiteUrl/HR Documents/Policies"
+                            permissions = @()
+                        }
+                        @{
+                            title = 'Employee Contracts'
+                            type = 'Folder'
+                            url = "$SiteUrl/HR Documents/Employee Contracts"
+                            permissions = @(
+                                @{ principal = 'HR Managers'; role = 'Full Control' }
+                            )
+                        }
+                    )
+                }
+                @{
+                    title = 'Site Pages'
+                    type = 'Library'
+                    url = "$SiteUrl/SitePages"
+                    permissions = @()
+                    children = @(
+                        @{
+                            title = 'Home.aspx'
+                            type = 'File'
+                            url = "$SiteUrl/SitePages/Home.aspx"
+                            permissions = @()
+                        }
+                    )
+                }
+                @{
+                    title = 'Tasks'
+                    type = 'List'
+                    url = "$SiteUrl/Lists/Tasks"
+                    permissions = @()
+                    children = @()
+                }
+            )
+        }
+    )
+
+    # Count totals
+    $totalItems = 0
+    $uniquePermissions = 0
+    $principals = @{}
+
+    function CountNode {
+        param($node)
+        $script:totalItems++
+        if ($node.permissions -and $node.permissions.Count -gt 0) {
+            $script:uniquePermissions++
+            foreach ($perm in $node.permissions) {
+                $principals[$perm.principal] = $true
+            }
+        }
+        if ($node.children) {
+            foreach ($child in $node.children) {
+                CountNode -node $child
+            }
+        }
+    }
+
+    foreach ($node in $tree) {
+        CountNode -node $node
+    }
+
+    return @{
+        totalItems = $totalItems
+        uniquePermissions = $uniquePermissions
+        totalPrincipals = $principals.Count
+        tree = $tree
+        scanType = $ScanType
+        scannedAt = (Get-Date).ToString("o")
     }
 }
