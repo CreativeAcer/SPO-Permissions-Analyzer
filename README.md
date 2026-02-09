@@ -114,13 +114,15 @@ The device code appears in the container terminal. Open `https://microsoft.com/d
 - **Groups** — membership analysis, empty group detection
 - **External Users** — domain analysis, access audit, enrichment with stale warnings
 - **Role Assignments** — principal-to-permission mapping with security review
-- **Inheritance** — broken inheritance overview with percentage scoring
+- **Inheritance** — broken inheritance overview with percentage scoring, **interactive tree view** showing parent-child hierarchy
 - **Sharing Links** — link type distribution, anonymous edit detection
 
-### Export & UI
-- CSV export from all deep dive views and risk findings
+### Interactive UI Features
+- **Global search** — Omnibox search across sites, users, groups with keyboard shortcuts (Ctrl+K / Cmd+K)
+- **Clickable charts** — Click any chart bar or segment to drill down into detailed data
+- **Tree visualizations** — Collapsible hierarchical view of permission inheritance
+- **Format selection** — Export any data as CSV or JSON with format chooser modal
 - Sortable/filterable tables with real-time search
-- Interactive charts and visual analytics
 - Responsive design for desktop and mobile
 
 ---

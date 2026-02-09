@@ -71,8 +71,13 @@ const API = {
     },
 
     exportData(type) {
-        // Returns a download, not JSON
+        // Returns a CSV download
         window.open(`/api/export/${type}`, '_blank');
+    },
+
+    exportDataJson(type) {
+        // Returns a JSON download
+        window.open(`/api/export-json/${type}`, '_blank');
     },
 
     async exportJson() {

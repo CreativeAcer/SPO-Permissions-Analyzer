@@ -16,11 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initConnection();
     initOperations();
     initAnalytics();
+    initGlobalSearch();
+    initExportModal();
     pollStatus();
 });
 
 // --- Tabs ---
 function initTabs() {
+    // Hide operations and analytics tabs initially
+    updateTabVisibility(false);
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -29,12 +34,35 @@ function initTabs() {
             const target = document.getElementById('tab-' + btn.dataset.tab);
             if (target) target.classList.add('active');
 
-            // Refresh analytics when switching to visual-analytics tab
-            if (btn.dataset.tab === 'visual-analytics' && appState.dataLoaded) {
+            // Refresh analytics when switching to analytics tab
+            if (btn.dataset.tab === 'analytics' && appState.dataLoaded) {
                 await refreshAnalytics();
             }
         });
     });
+}
+
+// Show/hide tabs based on connection state
+function updateTabVisibility(connected) {
+    const operationsTab = document.querySelector('.tab-btn[data-tab="operations"]');
+    const analyticsTab = document.querySelector('.tab-btn[data-tab="analytics"]');
+    const searchInput = document.getElementById('global-search-input');
+
+    if (connected) {
+        if (operationsTab) operationsTab.style.display = 'block';
+        if (analyticsTab) analyticsTab.style.display = 'block';
+        if (searchInput) {
+            searchInput.disabled = false;
+            searchInput.placeholder = 'Search sites, users, groups... (Ctrl+K)';
+        }
+    } else {
+        if (operationsTab) operationsTab.style.display = 'none';
+        if (analyticsTab) analyticsTab.style.display = 'none';
+        if (searchInput) {
+            searchInput.disabled = true;
+            searchInput.placeholder = 'Connect to SharePoint to enable search';
+        }
+    }
 }
 
 // --- Connection Tab ---
@@ -70,6 +98,7 @@ async function handleConnect() {
             appState.connected = true;
             results.textContent = `Connected successfully!\n\nSite: ${res.siteTitle || 'N/A'}\nURL: ${res.siteUrl || 'N/A'}\nUser: ${res.user || 'N/A'}\n\nYou can now use SharePoint Operations.`;
             updateConnectionUI(true);
+            updateTabVisibility(true);
             toast('Connected to SharePoint', 'success');
         } else {
             results.textContent = `Connection failed: ${res.message}`;
@@ -96,6 +125,7 @@ async function handleDemo() {
             appState.dataLoaded = true;
             results.textContent = 'Demo Mode activated!\n\nSample data has been generated.\nSwitch to Operations or Visual Analytics tab to explore.';
             updateConnectionUI(true);
+            updateTabVisibility(true);
             toast('Demo mode activated', 'success');
             await refreshAnalytics();
         } else {
@@ -217,20 +247,8 @@ async function handleReport() {
         return;
     }
 
-    try {
-        // Export full governance JSON report
-        const report = await API.exportJson();
-        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `spo_governance_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast('Governance JSON report downloaded', 'success');
-    } catch (e) {
-        toast('Report generation failed: ' + e.message, 'error');
-    }
+    // Show export format modal for full report
+    showExportModal('all', true);
 }
 
 // --- Analytics Tab ---
@@ -555,6 +573,92 @@ async function openDeepDive(type) {
     }
 }
 
+// --- Chart Drill-Down Helper Functions ---
+
+// Open sites deep dive filtered to a specific site
+window.openSiteDetailDeepDive = async function(siteName) {
+    if (!appState.dataLoaded) {
+        toast('Run an analysis first', 'info');
+        return;
+    }
+
+    const overlay = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    overlay.classList.remove('hidden');
+    document.getElementById('modal-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+
+    const escHandler = (e) => { if (e.key === 'Escape') { overlay.classList.add('hidden'); document.removeEventListener('keydown', escHandler); } };
+    document.addEventListener('keydown', escHandler);
+
+    title.textContent = 'Sites Deep Dive';
+    body.innerHTML = '<p class="text-center text-muted">Loading...</p>';
+
+    try {
+        const res = await API.getData('sites');
+        renderSitesDeepDive(body, res.data || []);
+
+        // Pre-fill search with site name after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            const searchInput = document.getElementById('dd-search');
+            if (searchInput) {
+                searchInput.value = siteName;
+                searchInput.dispatchEvent(new Event('input'));
+                searchInput.focus();
+            }
+        }, 100);
+    } catch (e) {
+        body.innerHTML = `<p class="text-center" style="color:#DC3545">Error loading data: ${esc(e.message)}</p>`;
+    }
+};
+
+// Open permissions deep dive filtered to a specific permission level
+window.openFilteredPermissionsDeepDive = async function(permissionLevel) {
+    if (!appState.dataLoaded) {
+        toast('Run an analysis first', 'info');
+        return;
+    }
+
+    const overlay = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    overlay.classList.remove('hidden');
+    document.getElementById('modal-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+
+    const escHandler = (e) => { if (e.key === 'Escape') { overlay.classList.add('hidden'); document.removeEventListener('keydown', escHandler); } };
+    document.addEventListener('keydown', escHandler);
+
+    title.textContent = 'Role Assignment Mapping';
+    body.innerHTML = '<p class="text-center text-muted">Loading...</p>';
+
+    try {
+        const res = await API.getData('roleassignments');
+        renderPermissionsDeepDive(body, res.data || []);
+
+        // Pre-select role filter after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            const roleFilter = document.getElementById('dd-role-filter');
+            if (roleFilter) {
+                roleFilter.value = permissionLevel;
+                roleFilter.dispatchEvent(new Event('change'));
+            }
+        }, 100);
+    } catch (e) {
+        body.innerHTML = `<p class="text-center" style="color:#DC3545">Error loading data: ${esc(e.message)}</p>`;
+    }
+};
+
+// Generic handler for deep dive chart clicks (for future extensions)
+window.onDeepDiveChartClick = function(canvasId, clickedData) {
+    // This can be extended in the future to handle specific chart interactions
+    // For now, we'll show a toast with the clicked data
+    console.log('Deep dive chart clicked:', canvasId, clickedData);
+};
+
 // --- Deep Dive Renderers ---
 
 function renderSitesDeepDive(container, data) {
@@ -568,7 +672,7 @@ function renderSitesDeepDive(container, data) {
             <div class="dd-stat"><span class="dd-stat-value">${formatStorage(totalStorage)}</span><span class="dd-stat-label">Total Storage</span></div>
             <div class="dd-stat"><span class="dd-stat-value">${avgStorage} MB</span><span class="dd-stat-label">Avg Storage</span></div>
         </div>
-        <div class="dd-filter-bar"><input type="text" placeholder="Search sites..." id="dd-search"><button class="btn btn-secondary" onclick="API.exportData('sites')">Export CSV</button></div>
+        <div class="dd-filter-bar"><input type="text" placeholder="Search sites..." id="dd-search"><button class="btn btn-secondary" onclick="showExportModal('sites')">Export</button></div>
         <table><thead><tr><th>Title</th><th>URL</th><th>Owner</th><th>Storage (MB)</th><th>Template</th></tr></thead>
         <tbody id="dd-sites-body">${renderSitesRows(data)}</tbody></table>`;
 
@@ -595,7 +699,7 @@ function renderUsersDeepDive(container, data) {
         </div>
         <div class="dd-filter-bar"><input type="text" placeholder="Search users..." id="dd-search">
         <select id="dd-type-filter"><option value="">All Types</option><option value="Internal">Internal</option><option value="External">External</option></select>
-        <button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button></div>
+        <button class="btn btn-secondary" onclick="showExportModal('users')">Export</button></div>
         <table><thead><tr><th>Name</th><th>Email</th><th>Type</th><th>Permission</th><th>Site Admin</th></tr></thead>
         <tbody id="dd-users-body">${renderUsersRows(data)}</tbody></table>`;
 
@@ -627,7 +731,7 @@ function renderGroupsDeepDive(container, data) {
             <div class="dd-stat"><span class="dd-stat-value">${totalMembers}</span><span class="dd-stat-label">Total Members</span></div>
             <div class="dd-stat"><span class="dd-stat-value" style="color:#DC3545">${empty}</span><span class="dd-stat-label">Empty Groups</span></div>
         </div>
-        <div class="dd-filter-bar"><input type="text" placeholder="Search groups..." id="dd-search"><button class="btn btn-secondary" onclick="API.exportData('groups')">Export CSV</button></div>
+        <div class="dd-filter-bar"><input type="text" placeholder="Search groups..." id="dd-search"><button class="btn btn-secondary" onclick="showExportModal('groups')">Export</button></div>
         <table><thead><tr><th>Name</th><th>Members</th><th>Permission</th><th>Description</th></tr></thead>
         <tbody id="dd-groups-body">${renderGroupsRows(data)}</tbody></table>`;
 
@@ -667,7 +771,7 @@ function renderExternalDeepDive(container, allUsers) {
         <div class="dd-filter-bar">
             <input type="text" placeholder="Search external users..." id="dd-search">
             <button class="btn btn-primary" id="btn-enrich" style="margin-left:8px">Enrich via Graph</button>
-            <button class="btn btn-secondary" onclick="API.exportData('users')">Export CSV</button>
+            <button class="btn btn-secondary" onclick="showExportModal('users')">Export</button>
         </div>
         <table><thead><tr><th>Name</th><th>Email</th><th>Domain</th><th>Permission</th><th>Account Status</th><th>Last Sign-In</th></tr></thead>
         <tbody id="dd-ext-body">${renderExternalRows(data)}</tbody></table>`;
@@ -828,7 +932,7 @@ function renderPermissionsDeepDive(container, data) {
         <div id="dd-table" class="dd-tab-content active">
             <div class="dd-filter-bar"><input type="text" placeholder="Search..." id="dd-search">
             <select id="dd-role-filter"><option value="">All Roles</option><option>Full Control</option><option>Edit</option><option>Contribute</option><option>Read</option><option>View Only</option></select>
-            <button class="btn btn-secondary" onclick="API.exportData('roleassignments')">Export CSV</button></div>
+            <button class="btn btn-secondary" onclick="showExportModal('roleassignments')">Export</button></div>
             <table><thead><tr><th>Principal</th><th>Type</th><th>Role</th><th>Scope</th><th>Location</th></tr></thead>
             <tbody id="dd-perm-body">${renderPermRows(data)}</tbody></table>
         </div>
@@ -865,6 +969,113 @@ function renderPermRows(data) {
     return data.map(r => `<tr><td>${esc(r.Principal)}</td><td>${esc(r.PrincipalType)}</td><td>${esc(r.Role)}</td><td>${esc(r.Scope)}</td><td>${esc(r.ScopeUrl)}</td></tr>`).join('');
 }
 
+// --- Tree Visualization Helper Functions ---
+
+// Transform flat inheritance data into hierarchical tree structure
+function buildInheritanceTree(data) {
+    const siteGroups = {};
+
+    // First pass: identify all sites (roots of the tree)
+    data.forEach(item => {
+        if (item.Type === 'Site') {
+            if (!siteGroups[item.Url]) {
+                siteGroups[item.Url] = {
+                    site: item,
+                    children: []
+                };
+            }
+        }
+    });
+
+    // Second pass: assign children to their parent sites
+    data.forEach(item => {
+        if (item.Type !== 'Site' && item.ParentUrl) {
+            const parent = siteGroups[item.ParentUrl];
+            if (parent) {
+                parent.children.push(item);
+            } else {
+                // Orphaned item (parent site not in data) - create a placeholder
+                if (!siteGroups[item.ParentUrl]) {
+                    siteGroups[item.ParentUrl] = {
+                        site: { Title: 'Unknown Site', Url: item.ParentUrl, Type: 'Site', HasUniquePermissions: false },
+                        children: [item]
+                    };
+                }
+            }
+        }
+    });
+
+    return Object.values(siteGroups);
+}
+
+// Render tree view HTML
+function renderTreeView(treeData) {
+    let html = '<div class="tree-view">';
+
+    treeData.forEach((siteGroup, index) => {
+        const site = siteGroup.site;
+        const siteId = `tree-site-${index}`;
+        const isBroken = site.HasUniquePermissions === true || site.HasUniquePermissions === 'True';
+
+        html += `
+            <div class="tree-node tree-node-site ${isBroken ? 'tree-node-broken' : 'tree-node-inheriting'}">
+                <div class="tree-node-header" onclick="toggleTreeNode('${siteId}')">
+                    <span class="tree-expand-icon ${siteGroup.children.length === 0 ? 'tree-no-children' : ''}" id="${siteId}-icon">
+                        ${siteGroup.children.length > 0 ? '▼' : ''}
+                    </span>
+                    <span class="tree-node-icon">🌐</span>
+                    <span class="tree-node-title">${esc(site.Title)}</span>
+                    <span class="tree-node-badge ${isBroken ? 'badge-broken' : 'badge-inheriting'}">
+                        ${isBroken ? 'Unique Permissions' : 'Inherited'}
+                    </span>
+                    ${site.RoleAssignmentCount ? `<span class="tree-node-count">${site.RoleAssignmentCount} assignments</span>` : ''}
+                </div>
+                <div class="tree-node-children" id="${siteId}-children">`;
+
+        // Render children (libraries/lists)
+        siteGroup.children.forEach((child, childIndex) => {
+            const childBroken = child.HasUniquePermissions === true || child.HasUniquePermissions === 'True';
+            const icon = child.Type === 'Document Library' || child.Type === 'Library' ? '📁' : '📄';
+
+            html += `
+                <div class="tree-node tree-node-child ${childBroken ? 'tree-node-broken' : 'tree-node-inheriting'}">
+                    <div class="tree-node-header">
+                        <span class="tree-node-icon">${icon}</span>
+                        <span class="tree-node-title">${esc(child.Title)}</span>
+                        <span class="tree-node-type">${esc(child.Type)}</span>
+                        <span class="tree-node-badge ${childBroken ? 'badge-broken' : 'badge-inheriting'}">
+                            ${childBroken ? 'Unique Permissions' : 'Inherited'}
+                        </span>
+                        ${child.RoleAssignmentCount ? `<span class="tree-node-count">${child.RoleAssignmentCount} assignments</span>` : ''}
+                    </div>
+                </div>`;
+        });
+
+        html += `
+                </div>
+            </div>`;
+    });
+
+    html += '</div>';
+    return html;
+}
+
+// Toggle tree node expansion
+window.toggleTreeNode = function(nodeId) {
+    const children = document.getElementById(`${nodeId}-children`);
+    const icon = document.getElementById(`${nodeId}-icon`);
+
+    if (children && icon) {
+        if (children.style.display === 'none') {
+            children.style.display = 'block';
+            icon.textContent = '▼';
+        } else {
+            children.style.display = 'none';
+            icon.textContent = '▶';
+        }
+    }
+};
+
 function renderInheritanceDeepDive(container, data) {
     const broken = data.filter(i => i.HasUniquePermissions === true || i.HasUniquePermissions === 'True').length;
     const inheriting = data.length - broken;
@@ -879,6 +1090,9 @@ function renderInheritanceDeepDive(container, data) {
     const brokenLibs = data.filter(i => (i.HasUniquePermissions === true || i.HasUniquePermissions === 'True') && (i.Type === 'Document Library' || i.Type === 'Library'));
     if (brokenLibs.length > 0) findings.push({ severity: 'medium', title: `${brokenLibs.length} libraries with unique permissions`, detail: 'Verify access on these document libraries is intentional.' });
 
+    // Build tree structure
+    const treeData = buildInheritanceTree(data);
+
     container.innerHTML = `
         <div class="dd-stats">
             <div class="dd-stat"><span class="dd-stat-value">${data.length}</span><span class="dd-stat-label">Total Items</span></div>
@@ -888,14 +1102,22 @@ function renderInheritanceDeepDive(container, data) {
             <div class="dd-stat"><span class="dd-stat-value">${lists}</span><span class="dd-stat-label">Lists</span></div>
         </div>
         <div class="dd-tabs">
-            <button class="dd-tab-btn active" data-ddtab="dd-table">Inheritance Tree</button>
+            <button class="dd-tab-btn active" data-ddtab="dd-tree">Tree View</button>
+            <button class="dd-tab-btn" data-ddtab="dd-table">Table View</button>
             <button class="dd-tab-btn" data-ddtab="dd-chart">Overview</button>
             <button class="dd-tab-btn" data-ddtab="dd-findings">Findings</button>
         </div>
-        <div id="dd-table" class="dd-tab-content active">
+        <div id="dd-tree" class="dd-tab-content active">
+            <div class="dd-filter-bar">
+                <select id="dd-tree-filter"><option value="">All Items</option><option value="broken">Broken Inheritance Only</option><option value="inheriting">Inheriting Only</option></select>
+                <button class="btn btn-secondary" onclick="showExportModal('inheritance')">Export</button>
+            </div>
+            <div id="dd-tree-container">${renderTreeView(treeData)}</div>
+        </div>
+        <div id="dd-table" class="dd-tab-content">
             <div class="dd-filter-bar"><input type="text" placeholder="Search..." id="dd-search">
             <select id="dd-inh-filter"><option value="">All Items</option><option value="broken">Broken Inheritance</option><option value="inheriting">Inheriting</option></select>
-            <button class="btn btn-secondary" onclick="API.exportData('inheritance')">Export CSV</button></div>
+            <button class="btn btn-secondary" onclick="showExportModal('inheritance')">Export</button></div>
             <table><thead><tr><th>Title</th><th>Type</th><th>Unique Perms</th><th>Role Assignments</th><th>Site</th></tr></thead>
             <tbody id="dd-inh-body">${renderInhRows(data)}</tbody></table>
         </div>
@@ -921,6 +1143,18 @@ function renderInheritanceDeepDive(container, data) {
     };
     document.getElementById('dd-search').addEventListener('input', filterInh);
     document.getElementById('dd-inh-filter').addEventListener('change', filterInh);
+
+    // Tree view filter
+    const filterTree = () => {
+        const f = document.getElementById('dd-tree-filter').value;
+        const filtered = data.filter(i => {
+            const isBroken = i.HasUniquePermissions === true || i.HasUniquePermissions === 'True';
+            return !f || (f === 'broken' && isBroken) || (f === 'inheriting' && !isBroken);
+        });
+        const filteredTree = buildInheritanceTree(filtered);
+        document.getElementById('dd-tree-container').innerHTML = renderTreeView(filteredTree);
+    };
+    document.getElementById('dd-tree-filter').addEventListener('change', filterTree);
 }
 
 function renderInhRows(data) {
@@ -958,7 +1192,7 @@ function renderSharingDeepDive(container, data) {
         <div id="dd-table" class="dd-tab-content active">
             <div class="dd-filter-bar"><input type="text" placeholder="Search..." id="dd-search">
             <select id="dd-link-filter"><option value="">All Types</option><option>Anonymous</option><option>Company-wide</option><option>Specific People</option></select>
-            <button class="btn btn-secondary" onclick="API.exportData('sharinglinks')">Export CSV</button></div>
+            <button class="btn btn-secondary" onclick="showExportModal('sharinglinks')">Export</button></div>
             <table><thead><tr><th>Link Type</th><th>Access</th><th>Recipients</th><th>Site</th><th>Created</th></tr></thead>
             <tbody id="dd-share-body">${renderShareRows(data)}</tbody></table>
         </div>
@@ -1102,6 +1336,391 @@ async function pollUntilComplete(consoleEl, intervalMs = 1000) {
     }
 }
 
+// --- Export Format Selection ---
+
+let pendingExportType = null;
+let pendingExportIsFullReport = false;
+
+// Show export format selection modal
+window.showExportModal = function(type, isFullReport = false) {
+    const modal = document.getElementById('export-modal');
+    const closeBtn = document.getElementById('export-modal-close');
+
+    pendingExportType = type;
+    pendingExportIsFullReport = isFullReport;
+
+    modal.classList.remove('hidden');
+
+    // Close handlers
+    closeBtn.onclick = () => modal.classList.add('hidden');
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+
+    // Escape key
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            modal.classList.add('hidden');
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+};
+
+// Handle format selection
+function initExportModal() {
+    document.querySelectorAll('.export-format-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const format = btn.dataset.format;
+            const modal = document.getElementById('export-modal');
+
+            modal.classList.add('hidden');
+
+            // Perform export based on format
+            if (pendingExportIsFullReport) {
+                handleReportExport(format);
+            } else {
+                handleDataExport(pendingExportType, format);
+            }
+        });
+    });
+}
+
+// Export data in selected format
+function handleDataExport(type, format) {
+    if (format === 'csv') {
+        API.exportData(type);
+        toast(`Exporting ${type} as CSV`, 'success');
+    } else if (format === 'json') {
+        API.exportDataJson(type);
+        toast(`Exporting ${type} as JSON`, 'success');
+    }
+}
+
+// Export full report in selected format
+async function handleReportExport(format) {
+    if (!appState.dataLoaded) {
+        toast('Run an analysis first', 'info');
+        return;
+    }
+
+    try {
+        if (format === 'json') {
+            const report = await API.exportJson();
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `spo_governance_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast('Governance JSON report downloaded', 'success');
+        } else if (format === 'csv') {
+            // Export all data types as separate CSV files
+            const types = ['sites', 'users', 'groups', 'roleassignments', 'inheritance', 'sharinglinks'];
+            types.forEach(type => API.exportData(type));
+            toast('Exporting all data as CSV files', 'success');
+        }
+    } catch (e) {
+        toast('Export failed: ' + e.message, 'error');
+    }
+}
+
+// --- Global Search Functionality ---
+
+let globalSearchData = {
+    sites: [],
+    users: [],
+    groups: [],
+    permissions: [],
+    inheritance: [],
+    loaded: false
+};
+
+let selectedResultIndex = -1;
+let currentSearchResults = [];
+
+// Initialize global search
+function initGlobalSearch() {
+    const searchInput = document.getElementById('global-search-input');
+    const searchResults = document.getElementById('global-search-results');
+
+    if (!searchInput || !searchResults) return;
+
+    // Keyboard shortcut (Ctrl+K or Cmd+K)
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+        }
+    });
+
+    // Search input handler with debounce
+    let debounceTimer;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+            searchResults.classList.add('hidden');
+            return;
+        }
+
+        if (!appState.dataLoaded) {
+            searchResults.innerHTML = '<div class="search-no-results">Please connect to SharePoint or start Demo Mode first</div>';
+            searchResults.classList.remove('hidden');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            performGlobalSearch(query);
+        }, 300);
+    });
+
+    // Keyboard navigation in search results
+    searchInput.addEventListener('keydown', (e) => {
+        if (!searchResults.classList.contains('hidden')) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedResultIndex = Math.min(selectedResultIndex + 1, currentSearchResults.length - 1);
+                highlightSelectedResult();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedResultIndex = Math.max(selectedResultIndex - 1, -1);
+                highlightSelectedResult();
+            } else if (e.key === 'Enter' && selectedResultIndex >= 0) {
+                e.preventDefault();
+                const result = currentSearchResults[selectedResultIndex];
+                if (result) {
+                    navigateToSearchResult(result.type, result.item);
+                }
+            } else if (e.key === 'Escape') {
+                searchResults.classList.add('hidden');
+                searchInput.blur();
+            }
+        }
+    });
+
+    // Focus handler - lazy load data
+    searchInput.addEventListener('focus', async () => {
+        if (!globalSearchData.loaded && appState.dataLoaded) {
+            await loadGlobalSearchData();
+        }
+    });
+
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+}
+
+// Load all data for searching (lazy loading)
+async function loadGlobalSearchData() {
+    try {
+        const [sites, users, groups, permissions, inheritance] = await Promise.all([
+            API.getData('sites'),
+            API.getData('users'),
+            API.getData('groups'),
+            API.getData('roleassignments'),
+            API.getData('inheritance')
+        ]);
+
+        globalSearchData = {
+            sites: sites.data || [],
+            users: users.data || [],
+            groups: groups.data || [],
+            permissions: permissions.data || [],
+            inheritance: inheritance.data || [],
+            loaded: true
+        };
+    } catch (e) {
+        console.error('Failed to load search data:', e);
+    }
+}
+
+// Perform search across all data types
+function performGlobalSearch(query) {
+    const q = query.toLowerCase();
+    const results = {
+        sites: [],
+        users: [],
+        groups: [],
+        permissions: [],
+        inheritance: []
+    };
+
+    // Search sites
+    results.sites = globalSearchData.sites.filter(s =>
+        (s.Title || '').toLowerCase().includes(q) ||
+        (s.Url || '').toLowerCase().includes(q) ||
+        (s.Owner || '').toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    // Search users
+    results.users = globalSearchData.users.filter(u =>
+        (u.Name || '').toLowerCase().includes(q) ||
+        (u.Email || '').toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    // Search groups
+    results.groups = globalSearchData.groups.filter(g =>
+        (g.Name || '').toLowerCase().includes(q) ||
+        (g.Description || '').toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    // Search permissions
+    results.permissions = globalSearchData.permissions.filter(p =>
+        (p.Principal || '').toLowerCase().includes(q) ||
+        (p.Role || '').toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    // Search inheritance
+    results.inheritance = globalSearchData.inheritance.filter(i =>
+        (i.Title || '').toLowerCase().includes(q) ||
+        (i.SiteTitle || '').toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    renderSearchResults(results, query);
+}
+
+// Render search results dropdown
+function renderSearchResults(results, query) {
+    const resultsContainer = document.getElementById('global-search-results');
+    const totalResults = results.sites.length + results.users.length + results.groups.length +
+                        results.permissions.length + results.inheritance.length;
+
+    if (totalResults === 0) {
+        resultsContainer.innerHTML = '<div class="search-no-results">No results found</div>';
+        resultsContainer.classList.remove('hidden');
+        currentSearchResults = [];
+        selectedResultIndex = -1;
+        return;
+    }
+
+    currentSearchResults = [];
+    let html = '';
+
+    // Helper to add result group
+    const addGroup = (title, items, type, icon) => {
+        if (items.length > 0) {
+            html += `<div class="search-result-group">
+                <div class="search-result-group-title">${icon} ${title} (${items.length})</div>`;
+
+            items.forEach((item, index) => {
+                const resultIndex = currentSearchResults.length;
+                currentSearchResults.push({ type, item });
+
+                let primaryText = '';
+                let secondaryText = '';
+
+                if (type === 'sites') {
+                    primaryText = esc(item.Title);
+                    secondaryText = esc(item.Url);
+                } else if (type === 'users') {
+                    primaryText = esc(item.Name);
+                    secondaryText = esc(item.Email);
+                } else if (type === 'groups') {
+                    primaryText = esc(item.Name);
+                    secondaryText = `${item.MemberCount || 0} members`;
+                } else if (type === 'permissions') {
+                    primaryText = esc(item.Principal);
+                    secondaryText = `${item.Role} on ${item.Scope}`;
+                } else if (type === 'inheritance') {
+                    primaryText = esc(item.Title);
+                    secondaryText = esc(item.SiteTitle);
+                }
+
+                html += `<div class="search-result-item" data-result-index="${resultIndex}" onclick="window.navigateToSearchResult('${type}', ${resultIndex})">
+                    <div class="search-result-primary">${primaryText}</div>
+                    <div class="search-result-secondary">${secondaryText}</div>
+                </div>`;
+            });
+
+            html += '</div>';
+        }
+    };
+
+    addGroup('Sites', results.sites, 'sites', '🌐');
+    addGroup('Users', results.users, 'users', '👤');
+    addGroup('Groups', results.groups, 'groups', '👥');
+    addGroup('Permissions', results.permissions, 'permissions', '🔐');
+    addGroup('Inheritance', results.inheritance, 'inheritance', '🔗');
+
+    resultsContainer.innerHTML = html;
+    resultsContainer.classList.remove('hidden');
+    selectedResultIndex = -1;
+}
+
+// Highlight selected result
+function highlightSelectedResult() {
+    const items = document.querySelectorAll('.search-result-item');
+    items.forEach((item, index) => {
+        if (index === selectedResultIndex) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
+
+// Navigate to selected search result
+window.navigateToSearchResult = function(type, indexOrItem) {
+    let item;
+
+    if (typeof indexOrItem === 'number') {
+        item = currentSearchResults[indexOrItem].item;
+    } else {
+        item = indexOrItem;
+    }
+
+    // Hide search results
+    document.getElementById('global-search-results').classList.add('hidden');
+    document.getElementById('global-search-input').value = '';
+
+    // Switch to analytics tab
+    const analyticsTab = document.querySelector('.tab-btn[data-tab="analytics"]');
+    if (analyticsTab) {
+        analyticsTab.click();
+    }
+
+    // Open appropriate deep dive with item pre-selected
+    setTimeout(() => {
+        if (type === 'sites') {
+            openSiteDetailDeepDive(item.Title);
+        } else if (type === 'users') {
+            openDeepDive('users');
+            setTimeout(() => {
+                const searchInput = document.getElementById('dd-search');
+                if (searchInput) {
+                    searchInput.value = item.Name || item.Email;
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+            }, 100);
+        } else if (type === 'groups') {
+            openDeepDive('groups');
+            setTimeout(() => {
+                const searchInput = document.getElementById('dd-search');
+                if (searchInput) {
+                    searchInput.value = item.Name;
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+            }, 100);
+        } else if (type === 'permissions') {
+            openFilteredPermissionsDeepDive(item.Role);
+        } else if (type === 'inheritance') {
+            openDeepDive('inheritance');
+            setTimeout(() => {
+                const searchInput = document.getElementById('dd-search');
+                if (searchInput) {
+                    searchInput.value = item.Title;
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+            }, 100);
+        }
+    }, 200);
+};
+
 // --- Status polling (lightweight, once on load) ---
 async function pollStatus() {
     try {
@@ -1121,6 +1740,7 @@ async function pollStatus() {
                 appState.dataLoaded = true;
             }
             updateConnectionUI(true);
+            updateTabVisibility(true);
             // Show pre-connected message
             const results = document.getElementById('connection-results');
             if (results && !appState.demoMode) {

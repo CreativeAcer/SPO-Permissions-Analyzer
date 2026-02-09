@@ -116,6 +116,15 @@ function renderStorageChart(sites) {
                 duration: 800,
                 easing: 'easeOutQuart'
             },
+            onClick: (event, activeElements) => {
+                if (activeElements && activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const siteName = sorted[index].title;
+                    if (window.openSiteDetailDeepDive) {
+                        window.openSiteDetailDeepDive(siteName);
+                    }
+                }
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -222,6 +231,15 @@ function renderPermissionChart(users, groups) {
                 animateRotate: true,
                 animateScale: true
             },
+            onClick: (event, activeElements) => {
+                if (activeElements && activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const permissionLevel = labels[index];
+                    if (window.openFilteredPermissionsDeepDive) {
+                        window.openFilteredPermissionsDeepDive(permissionLevel);
+                    }
+                }
+            },
             plugins: {
                 legend: {
                     position: 'right',
@@ -308,6 +326,15 @@ function renderDeepDiveChart(canvasId, type, data) {
                     duration: 800,
                     easing: 'easeOutQuart'
                 },
+                onClick: (event, activeElements) => {
+                    if (activeElements && activeElements.length > 0) {
+                        const index = activeElements[0].index;
+                        const clickedData = data[index];
+                        if (window.onDeepDiveChartClick) {
+                            window.onDeepDiveChartClick(canvasId, clickedData);
+                        }
+                    }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -358,6 +385,15 @@ function renderDeepDiveChart(canvasId, type, data) {
                     easing: 'easeOutQuart',
                     animateRotate: true,
                     animateScale: true
+                },
+                onClick: (event, activeElements) => {
+                    if (activeElements && activeElements.length > 0) {
+                        const index = activeElements[0].index;
+                        const clickedData = data[index];
+                        if (window.onDeepDiveChartClick) {
+                            window.onDeepDiveChartClick(canvasId, clickedData);
+                        }
+                    }
                 },
                 plugins: {
                     legend: {

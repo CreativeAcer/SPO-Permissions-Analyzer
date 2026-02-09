@@ -15,6 +15,10 @@
             <h1>SharePoint Online Permissions Tool</h1>
             <p>Web Interface</p>
         </div>
+        <div id="global-search-container" class="global-search-container">
+            <input type="search" id="global-search-input" class="global-search-input" placeholder="Search sites, users, groups... (Ctrl+K)" autocomplete="off">
+            <div id="global-search-results" class="global-search-results hidden"></div>
+        </div>
         <span id="connection-indicator">
             <span class="status-dot disconnected"></span>
             <span>Not connected</span>
@@ -221,6 +225,31 @@
                 <button id="modal-close">X</button>
             </div>
             <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Export Format Modal -->
+    <div id="export-modal" class="modal-overlay hidden">
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Select Export Format</h2>
+                <button id="export-modal-close">X</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #64748B;">Choose the format for your export:</p>
+                <div class="export-format-options">
+                    <button class="export-format-btn" data-format="csv">
+                        <span class="format-icon">📊</span>
+                        <span class="format-name">CSV</span>
+                        <span class="format-desc">Spreadsheet format</span>
+                    </button>
+                    <button class="export-format-btn" data-format="json">
+                        <span class="format-icon">📋</span>
+                        <span class="format-name">JSON</span>
+                        <span class="format-desc">Structured data format</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
