@@ -37,21 +37,29 @@ function Get-RealSites-DataDriven {
         $adminUrl = $tenantUrl -replace "\.sharepoint\.com", "-admin.sharepoint.com"
         $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
 
-        # Get access token for reconnecting to different URLs
-        $accessToken = $null
-        try {
-            $accessToken = Get-PnPAccessToken -ErrorAction SilentlyContinue
-        } catch { }
-
-        # Try to get sites with full details
+        # Try to get sites with full details using the existing connection
         try {
             Write-ConsoleOutput "Scanning tenant for site collections..."
 
-            # Try admin connection first for best results
+            # First try Get-PnPTenantSite on the existing connection (may need admin)
             try {
-                Write-ConsoleOutput "Attempting admin center connection for full details..."
-                if ($accessToken) {
-                    Connect-PnPOnline -Url $adminUrl -AccessToken $accessToken -ErrorAction Stop
+                Write-ConsoleOutput "Attempting to enumerate tenant sites..."
+                $sites = Invoke-WithThrottleProtection -OperationName "Get-PnPTenantSite" -ScriptBlock {
+                    Get-PnPTenantSite -ErrorAction Stop
+                }
+                Write-ActivityLog "Retrieved $($sites.Count) sites from tenant"
+                Write-ConsoleOutput "Successfully retrieved $($sites.Count) sites"
+            }
+            catch {
+                Write-ActivityLog "Standard enumeration failed, trying admin connection: $($_.Exception.Message)"
+                Write-ConsoleOutput "Standard access limited, trying admin center..."
+
+                # Fallback to admin connection
+                $token = $null
+                try { $token = Get-PnPAccessToken -ErrorAction SilentlyContinue } catch { }
+
+                if ($token) {
+                    Connect-PnPOnline -Url $adminUrl -AccessToken $token -ErrorAction Stop
                 } else {
                     Connect-PnPOnline -Url $adminUrl -ClientId $clientId -Interactive -ErrorAction Stop
                 }
@@ -59,23 +67,8 @@ function Get-RealSites-DataDriven {
                     Get-PnPTenantSite -Detailed -ErrorAction Stop
                 }
                 $requiresAdmin = $true
-                Write-ActivityLog "Retrieved $($sites.Count) sites with full details from admin center"
+                Write-ActivityLog "Retrieved $($sites.Count) sites from admin center"
                 Write-ConsoleOutput "Successfully retrieved $($sites.Count) sites with storage details"
-            }
-            catch {
-                Write-ActivityLog "Admin connection failed, trying regular connection: $($_.Exception.Message)"
-                Write-ConsoleOutput "Admin access unavailable, trying standard enumeration..."
-
-                # Fallback to regular tenant connection
-                if ($accessToken) {
-                    Connect-PnPOnline -Url $tenantUrl -AccessToken $accessToken -ErrorAction Stop
-                } else {
-                    Connect-PnPOnline -Url $tenantUrl -ClientId $clientId -Interactive -ErrorAction Stop
-                }
-                $sites = Invoke-WithThrottleProtection -OperationName "Get-PnPTenantSite" -ScriptBlock {
-                    Get-PnPTenantSite -ErrorAction Stop
-                }
-                Write-ConsoleOutput "Retrieved $($sites.Count) sites (limited details)"
             }
         }
         catch {
@@ -128,9 +121,13 @@ function Get-RealSites-DataDriven {
             elseif ($site.Usage -and $site.Usage.Storage) {
                 $storageValue = [math]::Round($site.Usage.Storage / 1MB, 0)
             }
-            elseif ($site.Url -and $accessToken) {
+            elseif ($site.Url) {
                 try {
-                    Connect-PnPOnline -Url $site.Url -AccessToken $accessToken -ErrorAction SilentlyContinue
+                    $token = $null
+                    try { $token = Get-PnPAccessToken -ErrorAction SilentlyContinue } catch { }
+                    if ($token) {
+                        Connect-PnPOnline -Url $site.Url -AccessToken $token -ErrorAction SilentlyContinue
+                    }
                     $siteDetail = Get-PnPSite -Includes Usage -ErrorAction SilentlyContinue
                     if ($siteDetail -and $siteDetail.Usage -and $siteDetail.Usage.Storage) {
                         $storageValue = [math]::Round($siteDetail.Usage.Storage / 1MB, 0)
@@ -264,20 +261,26 @@ function Get-RealPermissions-DataDriven {
         Write-ConsoleOutput ""
 
         Write-ConsoleOutput "Analyzing permissions for: $SiteUrl..."
-        Write-ConsoleOutput "Connecting to the specified site..."
 
-        # Get access token for connecting to the target site
-        $accessToken = $null
+        # Check if the background runspace already connected to the target site.
+        # If not (or connected to a different URL), reconnect.
+        $currentUrl = $null
         try {
-            $accessToken = Get-PnPAccessToken -ErrorAction SilentlyContinue
+            $currentUrl = (Get-PnPConnection -ErrorAction SilentlyContinue).Url
         } catch { }
 
-        # Connect to the site
-        $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
-        if ($accessToken) {
-            Connect-PnPOnline -Url $SiteUrl -AccessToken $accessToken -ErrorAction Stop
+        if ($currentUrl -and $currentUrl.TrimEnd('/') -eq $SiteUrl.TrimEnd('/')) {
+            Write-ConsoleOutput "Using existing connection to site..."
         } else {
-            Connect-PnPOnline -Url $SiteUrl -ClientId $clientId -Interactive
+            Write-ConsoleOutput "Connecting to the specified site..."
+            $token = $null
+            try { $token = Get-PnPAccessToken -ErrorAction SilentlyContinue } catch { }
+            if ($token) {
+                Connect-PnPOnline -Url $SiteUrl -AccessToken $token -ErrorAction Stop
+            } else {
+                $cid = Get-AppSetting -SettingName "SharePoint.ClientId"
+                Connect-PnPOnline -Url $SiteUrl -ClientId $cid -Interactive
+            }
         }
         Write-ConsoleOutput "Connected successfully!"
 
@@ -315,10 +318,13 @@ function Get-RealPermissions-DataDriven {
 
                 Write-ConsoleOutput "Attempting to get storage via admin connection..."
 
-                if ($accessToken) {
-                    Connect-PnPOnline -Url $adminUrl -AccessToken $accessToken -ErrorAction Stop
+                $adminToken = $null
+                try { $adminToken = Get-PnPAccessToken -ErrorAction SilentlyContinue } catch { }
+                if ($adminToken) {
+                    Connect-PnPOnline -Url $adminUrl -AccessToken $adminToken -ErrorAction Stop
                 } else {
-                    Connect-PnPOnline -Url $adminUrl -ClientId $clientId -Interactive -ErrorAction Stop
+                    $cid = Get-AppSetting -SettingName "SharePoint.ClientId"
+                    Connect-PnPOnline -Url $adminUrl -ClientId $cid -Interactive -ErrorAction Stop
                 }
                 $tenantSites = Get-PnPTenantSite -Url $SiteUrl -Detailed -ErrorAction Stop
 
@@ -329,10 +335,13 @@ function Get-RealPermissions-DataDriven {
                 }
 
                 # Reconnect to the original site
-                if ($accessToken) {
-                    Connect-PnPOnline -Url $SiteUrl -AccessToken $accessToken -ErrorAction Stop
+                $siteToken = $null
+                try { $siteToken = Get-PnPAccessToken -ErrorAction SilentlyContinue } catch { }
+                if ($siteToken) {
+                    Connect-PnPOnline -Url $SiteUrl -AccessToken $siteToken -ErrorAction Stop
                 } else {
-                    Connect-PnPOnline -Url $SiteUrl -ClientId $clientId -Interactive
+                    $cid = Get-AppSetting -SettingName "SharePoint.ClientId"
+                    Connect-PnPOnline -Url $SiteUrl -ClientId $cid -Interactive
                 }
             }
             catch {
