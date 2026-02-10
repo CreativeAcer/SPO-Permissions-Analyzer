@@ -267,9 +267,11 @@ function Start-BackgroundOperation {
     # can re-connect without an interactive prompt
     $accessToken = $null
     $tenantUrl = $null
+    $clientId = $null
     try {
         $accessToken = Get-PnPAccessToken -ErrorAction SilentlyContinue
         $tenantUrl = (Get-AppSetting -SettingName "SharePoint.TenantUrl")
+        $clientId = (Get-AppSetting -SettingName "SharePoint.ClientId")
     } catch { }
 
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -286,6 +288,7 @@ function Start-BackgroundOperation {
     $ps.Runspace.SessionStateProxy.SetVariable('ScriptRoot', $projectRoot)
     $ps.Runspace.SessionStateProxy.SetVariable('AccessToken', $accessToken)
     $ps.Runspace.SessionStateProxy.SetVariable('TenantUrl', $tenantUrl)
+    $ps.Runspace.SessionStateProxy.SetVariable('ClientId', $clientId)
 
     # The wrapper script loads all modules, re-establishes PnP connection, then runs the operation
     $wrapperScript = {
@@ -325,10 +328,13 @@ function Start-BackgroundOperation {
         # This is safe because SharedState is a synchronized hashtable
         $script:SharePointData = $SharedState.SharePointData
 
-        # Re-establish PnP connection in this runspace using the forwarded access token
-        if ($AccessToken -and $TenantUrl) {
+        # Re-establish PnP connection in this runspace.
+        # Use the operation-specific site URL if available (e.g. for permissions analysis),
+        # otherwise fall back to the tenant root URL (e.g. for site enumeration).
+        $connectUrl = if ($SharedState.OperationSiteUrl) { $SharedState.OperationSiteUrl } else { $TenantUrl }
+        if ($AccessToken -and $connectUrl) {
             try {
-                Connect-PnPOnline -Url $TenantUrl -AccessToken $AccessToken -ErrorAction Stop
+                Connect-PnPOnline -Url $connectUrl -AccessToken $AccessToken -ErrorAction Stop
             } catch {
                 [void]$SharedState.OperationLog.Add("Warning: Could not re-establish PnP connection in background: $($_.Exception.Message)")
             }
