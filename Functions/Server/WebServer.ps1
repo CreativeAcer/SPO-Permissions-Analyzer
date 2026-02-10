@@ -338,8 +338,11 @@ function Start-BackgroundOperation {
             $SharedState.OperationRunning = $true
             $SharedState.OperationComplete = $false
 
-            # Execute the actual operation
-            & $OperationScript
+            # Re-create the scriptblock in THIS runspace's session state so that
+            # variables like $SharedState, $ScriptRoot, $AccessToken resolve here
+            # instead of in the main thread's session (where they don't exist).
+            $localScript = [scriptblock]::Create($OperationScript.ToString())
+            & $localScript
 
             $SharedState.OperationRunning = $false
             $SharedState.OperationComplete = $true
