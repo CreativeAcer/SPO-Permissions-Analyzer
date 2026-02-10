@@ -164,7 +164,9 @@ You need an Azure AD App Registration to connect to SharePoint Online.
 1. **Azure Portal** > **App registrations** > **New registration**
 2. Name: `SharePoint Permissions Analyzer`
 3. Account types: **Single tenant**
-4. Redirect URI: **Public client/native** > `http://localhost`
+4. Authentication > **Allow public lcient flows** > `Yes`
+5. Redirect URI: **Public client/native (Web)** > `http://localhost` and `https://login.microsoftonline.com/common/oauth2/nativeclient`
+
 
 ### 2. Add API permissions
 
