@@ -26,7 +26,7 @@ function Get-SitePermissionsMatrix {
     $tree = [System.Collections.ArrayList]::new()
 
     try {
-        Write-Log "Starting permissions matrix scan for $SiteUrl (type: $ScanType)"
+        Write-ActivityLog "Starting permissions matrix scan for $SiteUrl (type: $ScanType)"
 
         # Get site permissions
         $site = Get-PnPWeb
@@ -85,7 +85,7 @@ function Get-SitePermissionsMatrix {
                         }
                     }
                 } catch {
-                    Write-Log "Warning: Could not get permissions for list $($list.Title): $($_.Exception.Message)"
+                    Write-ActivityLog "Warning: Could not get permissions for list $($list.Title): $($_.Exception.Message)"
                 }
             }
             $totalItems++
@@ -128,7 +128,7 @@ function Get-SitePermissionsMatrix {
                                     }
                                 }
                             } catch {
-                                Write-Log "Warning: Could not get permissions for item $($item.FieldValues.FileLeafRef): $($_.Exception.Message)"
+                                Write-ActivityLog "Warning: Could not get permissions for item $($item.FieldValues.FileLeafRef): $($_.Exception.Message)"
                             }
                         }
 
@@ -136,7 +136,7 @@ function Get-SitePermissionsMatrix {
                         $totalItems++
                     }
                 } catch {
-                    Write-Log "Warning: Could not scan items in list $($list.Title): $($_.Exception.Message)"
+                    Write-ActivityLog "Warning: Could not scan items in list $($list.Title): $($_.Exception.Message)"
                 }
             }
 
@@ -145,7 +145,7 @@ function Get-SitePermissionsMatrix {
 
         [void]$tree.Add($siteNode)
 
-        Write-Log "Permissions matrix scan complete: $totalItems items, $uniquePermissions unique permissions"
+        Write-ActivityLog "Permissions matrix scan complete: $totalItems items, $uniquePermissions unique permissions"
 
         return @{
             totalItems = $totalItems
@@ -157,7 +157,7 @@ function Get-SitePermissionsMatrix {
         }
 
     } catch {
-        Write-Log "ERROR: Permissions matrix scan failed: $($_.Exception.Message)"
+        Write-ActivityLog "ERROR: Permissions matrix scan failed: $($_.Exception.Message)"
         throw
     }
 }
