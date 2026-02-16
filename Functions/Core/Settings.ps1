@@ -11,6 +11,10 @@ $script:AppSettings = @{
     }
 }
 
+# Connection state (centralized here instead of scattered across entry points)
+$script:SPOConnected = $false
+$script:DemoMode = $false
+
 function Initialize-Settings {
     Write-Host "Settings initialized." -ForegroundColor Green
 }

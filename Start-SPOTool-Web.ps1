@@ -18,65 +18,52 @@ param(
 )
 
 # ============================================
-# 1. Load Core modules (shared with WPF version)
+# 1. Load Core modules
 # ============================================
 . "$PSScriptRoot\Functions\Core\Logging.ps1"
 . "$PSScriptRoot\Functions\Core\Settings.ps1"
+. "$PSScriptRoot\Functions\Core\OutputAdapter.ps1"
 . "$PSScriptRoot\Functions\Core\SharePointDataManager.ps1"
 . "$PSScriptRoot\Functions\Core\ThrottleProtection.ps1"
 . "$PSScriptRoot\Functions\Core\Checkpoint.ps1"
-. "$PSScriptRoot\Functions\Core\JsonExport.ps1"
-. "$PSScriptRoot\Functions\Core\GraphEnrichment.ps1"
-. "$PSScriptRoot\Functions\Core\RiskScoring.ps1"
 . "$PSScriptRoot\Functions\Core\AuditLog.ps1"
 
 # ============================================
-# 2. Load SharePoint modules (shared with WPF version)
+# 2. Load Analysis modules
+# ============================================
+. "$PSScriptRoot\Functions\Analysis\JsonExport.ps1"
+. "$PSScriptRoot\Functions\Analysis\GraphEnrichment.ps1"
+. "$PSScriptRoot\Functions\Analysis\RiskScoring.ps1"
+
+# ============================================
+# 3. Load SharePoint modules
 # ============================================
 . "$PSScriptRoot\Functions\SharePoint\SPOConnection.ps1"
 . "$PSScriptRoot\Functions\SharePoint\PermissionsMatrix.ps1"
+. "$PSScriptRoot\Functions\SharePoint\SiteCollector.ps1"
+. "$PSScriptRoot\Functions\SharePoint\PermissionsCollector.ps1"
 
 # ============================================
-# 3. Load Operations modules (real-mode data collection)
+# 4. Load Demo modules
 # ============================================
-. "$PSScriptRoot\Functions\UI\OperationsTab.ps1"
+. "$PSScriptRoot\Functions\Demo\DemoDataGenerator.ps1"
 
 # ============================================
-# 4. Load Web Server modules (HTTP server and API handlers)
+# 5. Load Web Server modules
 # ============================================
+. "$PSScriptRoot\Functions\Server\BackgroundJobManager.ps1"
 . "$PSScriptRoot\Functions\Server\WebServer.ps1"
 . "$PSScriptRoot\Functions\Server\ApiHandlers.ps1"
 
 # ============================================
-# 5. Initialize and start
+# 6. Initialize and start
 # ============================================
 Write-ActivityLog "=== SharePoint Permissions Analyzer (Web UI) ===" -Level "Information"
-
-# Override Write-ConsoleOutput for web mode - redirect to operation log
-function Write-ConsoleOutput {
-    param(
-        [string]$Message,
-        [switch]$Append,
-        [switch]$NewLine = $true,
-        [switch]$ForceUpdate
-    )
-    Add-OperationLog -Message $Message
-}
-
-# Override Update-UIAndWait for web mode - no-op
-function Update-UIAndWait {
-    param([int]$WaitMs = 0)
-    # No WPF dispatcher needed in web mode
-}
-
-# Initialize globals
-$script:SPOConnected = $false
-$script:DemoMode = $false
 
 Initialize-SharePointDataManager
 
 # ============================================
-# 6. Auto-connect if env vars are set (container mode)
+# 7. Auto-connect if env vars are set (container mode)
 # ============================================
 if ($env:SPO_TENANT_URL -and $env:SPO_CLIENT_ID) {
     Write-Host ""
