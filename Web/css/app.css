@@ -37,7 +37,7 @@
     --color-warning:          #F59E0B;
     --color-warning-bg:       #3A2C0D;
     --color-danger:           #EF4444;
-    --color-danger-bg:        #3D1515;
+    --color-danger-bg:        #7F1D1D;
 
     /* Shadows */
     --shadow-sm:          0 1px 3px rgba(0,0,0,0.4);
@@ -1155,23 +1155,23 @@ tbody tr:last-child td {
 }
 
 .finding.high {
-    background: linear-gradient(135deg, #3d1515 0%, #2a0a0a 100%);
-    border-left-color: var(--error-500);
+    background: linear-gradient(135deg, var(--color-danger-bg) 0%, rgba(127,29,29,0.5) 100%);
+    border-left-color: var(--color-danger);
 }
 
 .finding.medium {
-    background: linear-gradient(135deg, #3a2500 0%, #2a1805 100%);
-    border-left-color: var(--warning-500);
+    background: linear-gradient(135deg, var(--color-warning-bg) 0%, rgba(58,44,13,0.5) 100%);
+    border-left-color: var(--color-warning);
 }
 
 .finding.low {
-    background: linear-gradient(135deg, #0d3321 0%, #0a2a1a 100%);
-    border-left-color: var(--success-500);
+    background: linear-gradient(135deg, var(--color-success-bg) 0%, rgba(13,51,33,0.5) 100%);
+    border-left-color: var(--color-success);
 }
 
 .finding.info {
-    background: linear-gradient(135deg, #1e1e35 0%, #1a1a2e 100%);
-    border-left-color: var(--info-500);
+    background: linear-gradient(135deg, var(--color-border-subtle) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-primary);
 }
 
 .finding h4 {
@@ -1255,23 +1255,23 @@ tbody tr:last-child td {
 }
 
 .alert-item.warning {
-    background: linear-gradient(135deg, var(--warning-50) 0%, #1e1a0a 100%);
-    border-left-color: var(--warning-500);
+    background: linear-gradient(135deg, var(--color-warning-bg) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-warning);
 }
 
 .alert-item.danger {
-    background: linear-gradient(135deg, var(--error-50) 0%, #1e0a0a 100%);
-    border-left-color: var(--error-500);
+    background: linear-gradient(135deg, var(--color-danger-bg) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-danger);
 }
 
 .alert-item.info {
-    background: linear-gradient(135deg, var(--info-50) 0%, #1a1a2e 100%);
-    border-left-color: var(--info-500);
+    background: linear-gradient(135deg, var(--color-border-subtle) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-primary);
 }
 
 .alert-item.success {
-    background: linear-gradient(135deg, var(--success-50) 0%, #0a1e14 100%);
-    border-left-color: var(--success-500);
+    background: linear-gradient(135deg, var(--color-success-bg) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-success);
 }
 
 .alert-item h4 {
@@ -1569,7 +1569,7 @@ button:focus-visible {
 
 .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    background: linear-gradient(90deg, var(--color-gradient-start) 0%, var(--color-gradient-end) 100%);
     border-radius: var(--radius-full);
     transition: width 0.3s ease;
     position: relative;
@@ -1617,7 +1617,7 @@ button:focus-visible {
     left: 0;
     height: 100%;
     width: 40%;
-    background: linear-gradient(90deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent-muted) 100%);
     border-radius: var(--radius-full);
     animation: indeterminate 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -1767,7 +1767,7 @@ button:focus-visible {
 }
 
 .badge.badge-primary {
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
     color: white;
 }
 
@@ -2835,28 +2835,28 @@ tr:hover .table-actions {
 }
 
 .risk-banner.risk-critical {
-    border-left-color: var(--error-500);
-    background: linear-gradient(135deg, var(--error-50) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-danger);
+    background: linear-gradient(135deg, var(--color-danger-bg) 0%, var(--color-surface) 100%);
 }
 
 .risk-banner.risk-high {
-    border-left-color: #EA580C;
-    background: linear-gradient(135deg, var(--warning-50) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-warning);
+    background: linear-gradient(135deg, var(--color-warning-bg) 0%, var(--color-surface) 100%);
 }
 
 .risk-banner.risk-medium {
-    border-left-color: var(--warning-500);
-    background: linear-gradient(135deg, var(--warning-50) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-warning);
+    background: linear-gradient(135deg, var(--color-warning-bg) 0%, var(--color-surface) 100%);
 }
 
 .risk-banner.risk-low {
-    border-left-color: var(--success-500);
-    background: linear-gradient(135deg, var(--success-50) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-success);
+    background: linear-gradient(135deg, var(--color-success-bg) 0%, var(--color-surface) 100%);
 }
 
 .risk-banner.risk-none {
-    border-left-color: var(--success-500);
-    background: linear-gradient(135deg, var(--success-50) 0%, var(--color-surface) 100%);
+    border-left-color: var(--color-success);
+    background: linear-gradient(135deg, var(--color-success-bg) 0%, var(--color-surface) 100%);
 }
 
 .risk-score-circle {
