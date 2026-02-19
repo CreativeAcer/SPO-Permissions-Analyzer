@@ -8,7 +8,7 @@
 ![CodeFactor](https://www.codefactor.io/repository/github/creativeacer/permix/badge)
 
 <p align="center">
-  <img src="Images/permix-logo-dark.svg" alt="PermiX" width="420"/>
+  <img src="Web/Assets/permix-logo-dark.svg" alt="PermiX" width="420"/>
 </p>
 
 Ever wondered who actually has access to what in your SharePoint environment? This tool answers that question — with **risk scoring**, **external user enrichment via Microsoft Graph**, and **interactive visual analytics**.
