@@ -38,7 +38,7 @@ const GRADIENTS = {
 // Chart.js default configuration
 Chart.defaults.font.family = "'Segoe UI', -apple-system, system-ui, 'Inter', sans-serif";
 Chart.defaults.font.size = 13;
-Chart.defaults.color = '#52525B';
+Chart.defaults.color = '#94A3B8';
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 Chart.defaults.plugins.legend.labels.padding = 12;
 Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(24, 24, 27, 0.95)';
@@ -56,13 +56,13 @@ function renderStorageChart(sites) {
     if (!sites || sites.length === 0) {
         storageChart = new Chart(canvas, {
             type: 'bar',
-            data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: '#E5E7EB' }] },
+            data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: '#2E2E4A' }] },
             options: {
                 plugins: { legend: { display: false } },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: '#F3F4F6' }
+                        grid: { color: '#2E2E4A' }
                     },
                     x: { grid: { display: false } }
                 }
@@ -138,7 +138,7 @@ function renderStorageChart(sites) {
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: '#F3F4F6',
+                        color: '#2E2E4A',
                         drawBorder: false
                     },
                     ticks: {
@@ -176,7 +176,7 @@ function renderPermissionChart(users, groups) {
     if (allItems.length === 0) {
         permissionChart = new Chart(canvas, {
             type: 'doughnut',
-            data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }] },
+            data: { labels: ['No data'], datasets: [{ data: [1], backgroundColor: ['#2E2E4A'] }] },
             options: {
                 plugins: {
                     legend: {
@@ -217,7 +217,7 @@ function renderPermissionChart(users, groups) {
                 data,
                 backgroundColor: bgColors,
                 borderWidth: 3,
-                borderColor: '#fff',
+                borderColor: '#1A1A2E',
                 hoverBorderWidth: 4,
                 hoverOffset: 8
             }]
@@ -347,7 +347,7 @@ function renderDeepDiveChart(canvasId, type, data) {
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: '#F3F4F6',
+                            color: '#2E2E4A',
                             drawBorder: false
                         },
                         ticks: { padding: 8 }
@@ -372,7 +372,7 @@ function renderDeepDiveChart(canvasId, type, data) {
                     data: data.map(d => d.value),
                     backgroundColor: data.map(d => d.color || COLORS.blue),
                     borderWidth: 3,
-                    borderColor: '#fff',
+                    borderColor: '#1A1A2E',
                     hoverBorderWidth: 4,
                     hoverOffset: 8
                 }]
