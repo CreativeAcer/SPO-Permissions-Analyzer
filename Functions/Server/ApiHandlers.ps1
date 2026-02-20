@@ -570,14 +570,28 @@ function Handle-PostBuildPermissionsMatrix {
             return
         }
 
-        # Live mode - connect to the specific site
+        # Live mode - connect to the specific site.
+        # NOTE: Get-PnPAccessToken returns a token scoped to the originally connected resource
+        # (tenant root or admin URL). Passing that token to Connect-PnPOnline for a different
+        # site collection causes a 401 Unauthorized because the audience doesn't match.
+        # Fix: reconnect using the stored clientId so MSAL silently reuses its cached token.
         try {
             $currentConnection = Get-PnPConnection -ErrorAction SilentlyContinue
-            if ($currentConnection) {
-                $accessToken = Get-PnPAccessToken
-                Connect-PnPOnline -Url $siteUrl -AccessToken $accessToken -WarningAction SilentlyContinue
-            } else {
+            if (-not $currentConnection) {
                 throw "No active PnP connection"
+            }
+
+            $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
+            if (-not $clientId) {
+                throw "Client ID not found in settings. Please reconnect."
+            }
+
+            if ($env:SPO_HEADLESS) {
+                # Container/headless: DeviceLogin — MSAL will use cached tokens silently
+                Connect-PnPOnline -Url $siteUrl -ClientId $clientId -DeviceLogin -WarningAction SilentlyContinue
+            } else {
+                # Host mode: Interactive — MSAL will use cached tokens silently (no browser popup)
+                Connect-PnPOnline -Url $siteUrl -ClientId $clientId -Interactive -WarningAction SilentlyContinue
             }
         } catch {
             Send-JsonResponse -Response $Response -Data @{
