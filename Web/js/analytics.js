@@ -183,19 +183,21 @@ function openRiskDeepDive(risk) {
             const category = f.Category || f.category || 'General';
             const count = f.Count || f.count || 0;
             const color = severityColors[sev] || '#6C757D';
-            return `<div class="finding finding-item" data-severity="${sev}" style="border-left: 4px solid ${color}; margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;" onclick="toggleFindingDetails(${idx})">
+            // Map to existing CSS severity modifier so the dark-theme gradient background is applied
+            const sevClass = { Critical: 'high', High: 'high', Medium: 'medium', Low: 'low' }[sev] || 'info';
+            return `<div class="finding finding-item ${sevClass}" data-severity="${sev}" style="border-left-color: ${color}; cursor: pointer;" onclick="toggleFindingDetails(${idx})">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <h4 style="margin: 0 0 8px 0; font-size: 15px;">[${esc(f.RuleId || f.ruleId)}] ${esc(f.Title || f.title)}</h4>
-                    <span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${sev}</span>
+                    <h4 style="margin: 0 0 8px 0; font-size: var(--font-size-md); color: var(--color-text-primary);">[${esc(f.RuleId || f.ruleId)}] ${esc(f.Title || f.title)}</h4>
+                    <span style="background: ${color}; color: white; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold);">${sev}</span>
                 </div>
-                <div style="display: flex; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #666;">
+                <div style="display: flex; gap: 16px; margin-bottom: 8px; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
                     <span><strong>Category:</strong> ${esc(category)}</span>
                     ${count > 0 ? `<span><strong>Affected Items:</strong> ${count}</span>` : ''}
                     <span><strong>Score:</strong> ${f.Score || f.score}/100</span>
                 </div>
-                <p style="margin: 0; color: #333;">${esc(f.Description || f.description)}</p>
-                <div id="finding-details-${idx}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E7EB;">
-                    <p style="margin: 0; font-size: 13px; color: #666;"><strong>Recommendation:</strong> Review and remediate this finding to improve your security posture.</p>
+                <p style="margin: 0; color: var(--color-text-primary); font-size: var(--font-size-base);">${esc(f.Description || f.description)}</p>
+                <div id="finding-details-${idx}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border);">
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);"><strong>Recommendation:</strong> Review and remediate this finding to improve your security posture.</p>
                 </div>
             </div>`;
         }).join('');
