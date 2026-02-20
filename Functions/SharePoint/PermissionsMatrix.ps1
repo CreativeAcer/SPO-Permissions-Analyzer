@@ -58,7 +58,9 @@ function Get-SitePermissionsMatrix {
         $totalItems++
 
         # Get lists/libraries
-        $lists = Get-PnPList | Where-Object { -not $_.Hidden -and $_.ItemCount -gt 0 }
+        # -Includes ensures HasUniqueRoleAssignments is loaded; accessing an unloaded CSOM
+        # property throws PropertyOrFieldNotInitializedException which silently empties children.
+        $lists = Get-PnPList -Includes HasUniqueRoleAssignments | Where-Object { -not $_.Hidden -and $_.ItemCount -gt 0 }
 
         foreach ($list in $lists) {
             $listNode = @{
@@ -97,7 +99,8 @@ function Get-SitePermissionsMatrix {
             if ($ScanType -eq 'full' -or ($ScanType -eq 'quick' -and $list.HasUniqueRoleAssignments)) {
                 try {
                     # Get all items in the list
-                    $items = Get-PnPListItem -List $list.Title -PageSize 500 -ErrorAction SilentlyContinue
+                    # -Includes loads HasUniqueRoleAssignments so the hierarchy check doesn't throw.
+                    $items = Get-PnPListItem -List $list.Title -PageSize 500 -Includes "HasUniqueRoleAssignments" -ErrorAction SilentlyContinue
 
                     foreach ($item in $items) {
                         # Skip if quick scan and item inherits permissions
