@@ -32,9 +32,21 @@ async function handleConnect() {
         const res = await API.connect(tenantUrl, clientId);
         if (res.success) {
             appState.connected = true;
+
+            // Store capabilities in app state
+            appState.capabilities = res.capabilities || {};
+
             results.textContent = `Connected successfully!\n\nSite: ${res.siteTitle || 'N/A'}\nURL: ${res.siteUrl || 'N/A'}\nUser: ${res.user || 'N/A'}\n\nYou can now use SharePoint Operations.`;
+
+            // Display capabilities
+            displayCapabilities(res.capabilities);
+
             updateConnectionUI(true);
             updateTabVisibility(true);
+
+            // Conditionally enable operations based on capabilities
+            updateOperationsButtons(res.capabilities);
+
             toast('Connected to SharePoint', 'success');
         } else {
             results.textContent = `Connection failed: ${res.message}`;
@@ -59,9 +71,27 @@ async function handleDemo() {
             appState.connected = true;
             appState.demoMode = true;
             appState.dataLoaded = true;
+
+            // Demo mode has all capabilities
+            appState.capabilities = {
+                CanEnumerateSites: true,
+                CanReadUsers: true,
+                CanAccessStorageData: true,
+                CanReadExternalUsers: true,
+                CheckedAt: new Date().toISOString()
+            };
+
             results.textContent = 'Demo Mode activated!\n\nSample data has been generated.\nSwitch to Operations or Visual Analytics tab to explore.';
+
+            // Display demo capabilities
+            displayCapabilities(appState.capabilities);
+
             updateConnectionUI(true);
             updateTabVisibility(true);
+
+            // Enable all buttons in demo mode
+            updateOperationsButtons(appState.capabilities);
+
             toast('Demo mode activated', 'success');
             await refreshAnalytics();
         } else {
@@ -114,16 +144,135 @@ async function pollStatus() {
             if (status.metrics && status.metrics.totalSites > 0) {
                 appState.dataLoaded = true;
             }
+
+            // For pre-existing connections, assume full capabilities if demo mode
+            // otherwise assume limited capabilities (user should re-connect for fresh check)
+            if (status.demoMode) {
+                appState.capabilities = {
+                    CanEnumerateSites: true,
+                    CanReadUsers: true,
+                    CanAccessStorageData: true,
+                    CanReadExternalUsers: true
+                };
+            } else {
+                // Assume limited capabilities on reconnect
+                // User can re-connect to get fresh capability check
+                appState.capabilities = {
+                    CanEnumerateSites: false,
+                    CanReadUsers: false,
+                    CanAccessStorageData: false,
+                    CanReadExternalUsers: false
+                };
+            }
+
             updateConnectionUI(true);
             updateTabVisibility(true);
+            updateOperationsButtons(appState.capabilities);
+
             // Show pre-connected message
             const results = document.getElementById('connection-results');
             if (results && !appState.demoMode) {
-                results.textContent = 'Already connected to SharePoint Online.\nYou can use SharePoint Operations.';
+                results.textContent = 'Already connected to SharePoint Online.\nRe-connect to refresh capability status.';
             }
             if (appState.dataLoaded) await refreshAnalytics();
         }
     } catch (e) {
         // Server not ready yet, ignore
+    }
+}
+
+// --- Capability Display ---
+function displayCapabilities(capabilities) {
+    const container = document.getElementById('capability-status');
+    if (!container || !capabilities) return;
+
+    const items = [
+        {
+            key: 'CanEnumerateSites',
+            label: 'Site enumeration',
+            enabledNote: 'Can retrieve all tenant sites',
+            disabledNote: 'Requires SharePoint Administrator role'
+        },
+        {
+            key: 'CanReadUsers',
+            label: 'User iteration',
+            enabledNote: 'Can enumerate tenant users',
+            disabledNote: 'Requires User.Read.All permission'
+        },
+        {
+            key: 'CanAccessStorageData',
+            label: 'Storage data',
+            enabledNote: 'Can view site storage metrics',
+            disabledNote: 'Limited storage information available'
+        },
+        {
+            key: 'CanReadExternalUsers',
+            label: 'External user data',
+            enabledNote: 'Can query external/guest users',
+            disabledNote: 'Requires User.Read.All permission'
+        }
+    ];
+
+    const itemsHtml = items.map(item => {
+        const enabled = capabilities[item.key] === true;
+        const icon = enabled ? '✓' : '✗';
+        const iconClass = enabled ? 'enabled' : 'disabled';
+        const note = enabled ? item.enabledNote : item.disabledNote;
+
+        return `
+            <div class="capability-item">
+                <span class="capability-icon ${iconClass}">${icon}</span>
+                <div class="capability-text">
+                    <span class="capability-label">${item.label}:</span>
+                    <span class="${enabled ? 'text-success' : 'text-warning'}">
+                        ${enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <span class="capability-note">${note}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <h4>Your Capabilities</h4>
+        <div class="capability-list">
+            ${itemsHtml}
+        </div>
+    `;
+
+    container.classList.remove('hidden');
+}
+
+// --- Update Operations Buttons Based on Capabilities ---
+function updateOperationsButtons(capabilities) {
+    const getSitesBtn = document.getElementById('btn-get-sites');
+
+    if (!capabilities || !capabilities.CanEnumerateSites) {
+        // Keep button disabled and add tooltip
+        getSitesBtn.classList.add('btn-disabled', 'btn-with-tooltip');
+
+        // Wrap in tooltip if not already wrapped
+        if (!getSitesBtn.parentElement.classList.contains('tooltip-wrapper')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tooltip-wrapper';
+            getSitesBtn.parentNode.insertBefore(wrapper, getSitesBtn);
+            wrapper.appendChild(getSitesBtn);
+
+            const tooltip = document.createElement('span');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = 'SharePoint Administrator role required to enumerate all tenant sites';
+            wrapper.appendChild(tooltip);
+        }
+    } else {
+        // User has admin rights - enable the button
+        getSitesBtn.classList.remove('btn-disabled', 'btn-with-tooltip');
+
+        // Remove tooltip wrapper if it exists
+        if (getSitesBtn.parentElement.classList.contains('tooltip-wrapper')) {
+            const wrapper = getSitesBtn.parentElement;
+            const parent = wrapper.parentNode;
+            parent.insertBefore(getSitesBtn, wrapper);
+            wrapper.remove();
+        }
     }
 }

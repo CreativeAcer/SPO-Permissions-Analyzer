@@ -7,7 +7,8 @@ let appState = {
     connected: false,
     demoMode: false,
     dataLoaded: false,
-    headless: false
+    headless: false,
+    capabilities: {}
 };
 
 // --- Utilities ---

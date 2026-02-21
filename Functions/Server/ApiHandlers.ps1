@@ -135,12 +135,32 @@ function Handle-PostConnect {
         }
         catch { }
 
+        # Test user capabilities
+        $capabilities = $null
+        try {
+            Write-ActivityLog "Testing user capabilities..." -Level "Information"
+            $capabilities = Test-UserCapabilities
+        }
+        catch {
+            Write-ActivityLog "Capability check failed: $($_.Exception.Message)" -Level "Warning"
+            # Return safe defaults if capability check fails
+            $capabilities = @{
+                CanEnumerateSites = $false
+                CanReadUsers = $false
+                CanAccessStorageData = $false
+                CanReadExternalUsers = $false
+                CheckedAt = (Get-Date).ToString("o")
+                Error = "Capability check failed"
+            }
+        }
+
         Send-JsonResponse -Response $Response -Data @{
             success = $true
             message = "Connected to SharePoint Online"
             siteTitle = if ($web) { $web.Title } else { "SharePoint Site" }
             siteUrl = if ($web) { $web.Url } else { $body.tenantUrl }
             user = $currentUser
+            capabilities = $capabilities
         }
     }
     catch {
