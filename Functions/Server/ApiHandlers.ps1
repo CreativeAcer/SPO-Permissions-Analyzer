@@ -106,10 +106,11 @@ function Handle-PostConnect {
         # Attempt connection
         Write-ActivityLog "Web UI connecting to: $($body.tenantUrl)" -Level "Information"
 
-        # Extract tenant name from URL for authentication
-        # e.g., https://contoso.sharepoint.com -> contoso.onmicrosoft.com
+        # Extract tenant name from URL for DeviceLogin authentication
+        # e.g., https://contoso.sharepoint.com or https://contoso-admin.sharepoint.com -> contoso.onmicrosoft.com
         $tenantName = $null
-        if ($body.tenantUrl -match '//([^\.]+)\.sharepoint\.com') {
+        if ($body.tenantUrl -match '//([^-\.]+)') {
+            # Extract base tenant name (before any hyphens like -admin or -my)
             $tenantName = "$($matches[1]).onmicrosoft.com"
         }
 
@@ -119,6 +120,9 @@ function Handle-PostConnect {
             Write-Host ""
             Write-Host "  Device code authentication requested from Web UI" -ForegroundColor Yellow
             Write-Host "  Tenant: $($body.tenantUrl)" -ForegroundColor White
+            if ($tenantName) {
+                Write-Host "  Tenant ID: $tenantName" -ForegroundColor White
+            }
             Write-Host ""
             if ($tenantName) {
                 Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin
@@ -127,12 +131,8 @@ function Handle-PostConnect {
             }
         }
         else {
-            # Host mode: use interactive browser popup
-            if ($tenantName) {
-                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -Interactive
-            } else {
-                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
-            }
+            # Host mode: use interactive browser popup (doesn't need -Tenant parameter)
+            Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
         }
 
         $web = Get-PnPWeb -ErrorAction SilentlyContinue
@@ -150,15 +150,7 @@ function Handle-PostConnect {
         }
         catch { }
 
-        # Test user capabilities (temporarily disabled for debugging)
-        $capabilities = @{
-            CanEnumerateSites = $true
-            CanReadUsers = $true
-            CanAccessStorageData = $true
-            CanReadExternalUsers = $true
-            CheckedAt = (Get-Date).ToString("o")
-        }
-        <#
+        # Test user capabilities
         $capabilities = $null
         try {
             Write-ActivityLog "Testing user capabilities..." -Level "Information"
@@ -167,6 +159,7 @@ function Handle-PostConnect {
         catch {
             Write-ActivityLog "Capability check failed: $($_.Exception.Message)" -Level "Warning"
             # Return safe defaults if capability check fails
+            # This ensures connection succeeds even if capability testing fails
             $capabilities = @{
                 CanEnumerateSites = $false
                 CanReadUsers = $false
@@ -176,7 +169,6 @@ function Handle-PostConnect {
                 Error = "Capability check failed"
             }
         }
-        #>
 
         Send-JsonResponse -Response $Response -Data @{
             success = $true
