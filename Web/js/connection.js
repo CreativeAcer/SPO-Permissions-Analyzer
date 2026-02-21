@@ -19,10 +19,19 @@ async function handleConnect() {
 
     if (appState.headless) {
         results.textContent = 'Connecting via device code flow...\n\n'
-            + 'Check the container terminal for the authentication code.\n'
-            + '(Run "podman logs <container>" or check the terminal where compose is running)\n\n'
-            + 'Open https://microsoft.com/devicelogin and enter the code shown there.\n\n'
-            + 'Waiting for authentication...';
+            + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+            + '📋 DEVICE CODE AUTHENTICATION\n'
+            + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+            + '1️⃣  Check the container terminal for your device code\n'
+            + '    → Run: podman logs <container>\n'
+            + '    → Or check the terminal where "podman compose up" is running\n\n'
+            + '2️⃣  Look for a line like:\n'
+            + '    "To sign in, use a web browser to open the page\n'
+            + '     https://microsoft.com/devicelogin and enter\n'
+            + '     the code ABC123XYZ to authenticate."\n\n'
+            + '3️⃣  Open https://microsoft.com/devicelogin in your browser\n\n'
+            + '4️⃣  Enter the code from the terminal\n\n'
+            + '⏳ Waiting for authentication...';
     } else {
         results.textContent = 'Connecting to SharePoint Online...\nPlease complete authentication in the popup window.';
     }

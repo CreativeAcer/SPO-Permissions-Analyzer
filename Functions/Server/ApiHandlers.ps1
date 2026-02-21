@@ -127,7 +127,6 @@ function Handle-PostConnect {
 
         if ($env:SPO_HEADLESS) {
             # Container/headless mode: use device code flow
-            # The device code appears in the container terminal (podman logs / docker logs)
             Write-Host ""
             Write-Host "========================================" -ForegroundColor Cyan
             Write-Host "  DEVICE CODE AUTHENTICATION" -ForegroundColor Cyan
@@ -142,9 +141,7 @@ function Handle-PostConnect {
             Write-Host "  (The device code will appear below)" -ForegroundColor Yellow
             Write-Host ""
 
-            # Force interactive output by redirecting all streams and flushing
-            $originalOutput = [Console]::Out
-
+            # Connect and capture output
             try {
                 if ($tenantName) {
                     Connect-PnPOnline -Url $connectionUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host

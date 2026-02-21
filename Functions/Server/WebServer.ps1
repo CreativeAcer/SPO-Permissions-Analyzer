@@ -50,7 +50,7 @@ function Start-WebServer {
         $listener.Start()
         Write-Host ""
         Write-Host "  =======================================" -ForegroundColor Cyan
-        Write-Host "  SharePoint Permissions Analyzer (Web)" -ForegroundColor Cyan
+        Write-Host "  PermiX (Web)" -ForegroundColor Cyan
         Write-Host "  =======================================" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "  Server running at: " -NoNewline
