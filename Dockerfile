@@ -8,8 +8,10 @@
 
 FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04
 
-# Install xsel for clipboard support (required by PnP PowerShell on Linux)
-RUN apt-get update && apt-get install -y xsel && rm -rf /var/lib/apt/lists/*
+# Create a dummy xsel that silently succeeds (PnP tries to copy device code to clipboard)
+# In a headless container, we don't need clipboard support, just need xsel to not fail
+RUN echo '#!/bin/bash\ncat > /dev/null 2>&1\nexit 0' > /usr/local/bin/xsel && \
+    chmod +x /usr/local/bin/xsel
 
 # Install PnP.PowerShell module
 RUN pwsh -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
