@@ -85,9 +85,15 @@ async function handleAnalyze() {
             console_.textContent += '\n';
             console_.textContent += 'Run: podman logs <container>\n';
             console_.textContent += '\n';
-            console_.textContent += 'Visit: https://microsoft.com/devicelogin\n';
+            console_.textContent += '🌐 Opening device login page in new tab...\n';
             console_.textContent += '\n';
             console_.textContent += '⏳ Waiting for authentication...\n';
+
+            // Automatically open device login page in new tab
+            const loginWindow = window.open('https://microsoft.com/devicelogin', '_blank');
+            if (!loginWindow) {
+                console_.textContent += '\n⚠️  Popup blocked! Manually visit: https://microsoft.com/devicelogin\n';
+            }
 
             // Give user a moment to see the message
             await new Promise(r => setTimeout(r, 500));
