@@ -8,10 +8,11 @@
 
 FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04
 
-# Create a dummy xsel that silently succeeds (PnP tries to copy device code to clipboard)
-# In a headless container, we don't need clipboard support, just need xsel to not fail
-RUN echo '#!/bin/bash\ncat > /dev/null 2>&1\nexit 0' > /usr/local/bin/xsel && \
-    chmod +x /usr/local/bin/xsel
+# Create a dummy xsel at /usr/bin (where bash will find it first)
+# PnP PowerShell tries to copy device code to clipboard, but in a headless
+# container we just need xsel to silently succeed without requiring X display
+RUN printf '#!/bin/bash\ncat > /dev/null 2>&1\nexit 0\n' > /usr/bin/xsel && \
+    chmod +x /usr/bin/xsel
 
 # Install PnP.PowerShell module
 RUN pwsh -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
