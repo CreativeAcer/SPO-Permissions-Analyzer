@@ -45,6 +45,7 @@ async function handleGetSites() {
 }
 
 async function handleAnalyze() {
+    console.log('handleAnalyze called'); // Debug log
     const siteUrl = document.getElementById('input-site-url').value.trim();
     const console_ = document.getElementById('operations-console');
     console_.textContent = 'Starting permissions analysis...\n';
