@@ -21,6 +21,7 @@ function Invoke-ApiHandler {
     switch -Wildcard ($Path) {
         "/api/status"       { Handle-GetStatus -Response $Response }
         "/api/connect"      { Handle-PostConnect -Request $Request -Response $Response }
+        "/api/devicecode"   { Handle-GetDeviceCode -Response $Response }
         "/api/demo"         { Handle-PostDemo -Response $Response }
         "/api/sites"        { Handle-PostSites -Request $Request -Response $Response }
         "/api/permissions"  { Handle-PostPermissions -Request $Request -Response $Response }
@@ -78,6 +79,18 @@ function Handle-GetStatus {
     }
 }
 
+# ---- Device Code ----
+
+function Handle-GetDeviceCode {
+    param($Response)
+
+    Send-JsonResponse -Response $Response -Data @{
+        deviceCode = $script:DeviceCode
+        deviceUrl = $script:DeviceUrl
+        authCompleted = [bool]$script:SPOConnected
+    }
+}
+
 # ---- Connect ----
 
 function Handle-PostConnect {
@@ -126,7 +139,7 @@ function Handle-PostConnect {
         }
 
         if ($env:SPO_HEADLESS) {
-            # Container/headless mode: use device code flow
+            # Container/headless mode: use device code flow with background job
             Write-Host ""
             Write-Host "========================================" -ForegroundColor Cyan
             Write-Host "  DEVICE CODE AUTHENTICATION" -ForegroundColor Cyan
@@ -138,20 +151,69 @@ function Handle-PostConnect {
             }
             Write-Host ""
             Write-Host "  Initiating authentication..." -ForegroundColor Yellow
-            Write-Host "  (The device code will appear below)" -ForegroundColor Yellow
+            Write-Host "  (The device code will appear below and in the browser)" -ForegroundColor Yellow
             Write-Host ""
 
-            # Connect and capture output
-            try {
-                if ($tenantName) {
-                    Connect-PnPOnline -Url $connectionUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
+            # Clear previous device code
+            $script:DeviceCode = $null
+            $script:DeviceUrl = "https://microsoft.com/devicelogin"
+
+            # Start connection in background job to capture device code
+            $authJob = Start-Job -ScriptBlock {
+                param($Url, $ClientId, $Tenant)
+
+                # Load PnP module in job
+                Import-Module PnP.PowerShell -ErrorAction Stop
+
+                if ($Tenant) {
+                    Connect-PnPOnline -Url $Url -ClientId $ClientId -Tenant $Tenant -DeviceLogin
                 } else {
-                    Connect-PnPOnline -Url $connectionUrl -ClientId $body.clientId -DeviceLogin *>&1 | Out-Host
+                    Connect-PnPOnline -Url $Url -ClientId $ClientId -DeviceLogin
+                }
+            } -ArgumentList $connectionUrl, $body.clientId, $tenantName
+
+            # Monitor job output for device code
+            $codeFound = $false
+            $timeout = [DateTime]::Now.AddSeconds(120)
+
+            while (-not $codeFound -and [DateTime]::Now -lt $timeout) {
+                Start-Sleep -Milliseconds 500
+
+                $jobOutput = Receive-Job -Job $authJob 2>&1
+                if ($jobOutput) {
+                    # Display in terminal
+                    $jobOutput | Out-Host
+
+                    # Parse for device code
+                    $jobOutput | ForEach-Object {
+                        $line = $_.ToString()
+                        if ($line -match 'enter the code\s+([A-Z0-9]+)') {
+                            $script:DeviceCode = $matches[1]
+                            $codeFound = $true
+                            Write-Host "  📋 Device Code: $($script:DeviceCode)" -ForegroundColor Green
+                        }
+                        if ($line -match '(https://[^\s]+/devicelogin)') {
+                            $script:DeviceUrl = $matches[1]
+                        }
+                    }
+                }
+
+                # Check if job completed
+                if ($authJob.State -ne 'Running') {
+                    break
                 }
             }
-            finally {
-                [Console]::Out.Flush()
+
+            # Wait for job to complete
+            $authJob | Wait-Job -Timeout 300 | Out-Null
+
+            # Get final output
+            $finalOutput = Receive-Job -Job $authJob 2>&1
+            if ($finalOutput) {
+                $finalOutput | Out-Host
             }
+
+            Remove-Job -Job $authJob -Force
 
             Write-Host ""
             Write-Host "========================================" -ForegroundColor Green

@@ -22,16 +22,34 @@ async function handleConnect() {
             + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
             + '📋 DEVICE CODE AUTHENTICATION\n'
             + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
-            + '1️⃣  Check the container terminal for your device code\n'
-            + '    → Run: podman logs <container>\n'
-            + '    → Or check the terminal where "podman compose up" is running\n\n'
-            + '2️⃣  Look for a line like:\n'
-            + '    "To sign in, use a web browser to open the page\n'
-            + '     https://microsoft.com/devicelogin and enter\n'
-            + '     the code ABC123XYZ to authenticate."\n\n'
-            + '3️⃣  Open https://microsoft.com/devicelogin in your browser\n\n'
-            + '4️⃣  Enter the code from the terminal\n\n'
-            + '⏳ Waiting for authentication...';
+            + '⏳ Waiting for device code...';
+
+        // Start polling for device code
+        const pollInterval = setInterval(async () => {
+            try {
+                const deviceInfo = await API.getDeviceCode();
+                if (deviceInfo.deviceCode) {
+                    results.textContent = 'Connecting via device code flow...\n\n'
+                        + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+                        + '📋 DEVICE CODE AUTHENTICATION\n'
+                        + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+                        + `🔑 Your Device Code: ${deviceInfo.deviceCode}\n\n`
+                        + `1️⃣  Open this URL in your browser:\n`
+                        + `    ${deviceInfo.deviceUrl || 'https://microsoft.com/devicelogin'}\n\n`
+                        + `2️⃣  Enter the code: ${deviceInfo.deviceCode}\n\n`
+                        + '⏳ Waiting for authentication...';
+
+                    if (deviceInfo.authCompleted) {
+                        clearInterval(pollInterval);
+                    }
+                }
+            } catch (e) {
+                // Ignore polling errors
+            }
+        }, 1000);
+
+        // Store interval ID to clear it later
+        window.deviceCodePollInterval = pollInterval;
     } else {
         results.textContent = 'Connecting to SharePoint Online...\nPlease complete authentication in the popup window.';
     }
@@ -39,6 +57,12 @@ async function handleConnect() {
 
     try {
         const res = await API.connect(tenantUrl, clientId);
+
+        // Clear device code polling
+        if (window.deviceCodePollInterval) {
+            clearInterval(window.deviceCodePollInterval);
+            window.deviceCodePollInterval = null;
+        }
         if (res.success) {
             appState.connected = true;
 

@@ -30,6 +30,10 @@ const API = {
         return this.post('connect', { tenantUrl, clientId });
     },
 
+    getDeviceCode() {
+        return this.get('devicecode');
+    },
+
     startDemo() {
         return this.post('demo');
     },
