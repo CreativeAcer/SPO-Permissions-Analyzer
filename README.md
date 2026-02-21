@@ -128,6 +128,12 @@ The device code appears in the container terminal. Open `https://microsoft.com/d
 - Sortable/filterable tables with real-time search
 - Responsive design for desktop and mobile
 
+### 🔑 Capability Awareness
+- **Proactive permission checking** — After connecting to SharePoint, PermiX tests what data you can access and shows you upfront
+- **Transparent capability status** — Clear indicators show whether you can enumerate sites, read users, access storage data, and query external users
+- **Smart button states** — Operations requiring admin permissions (like "Get All Sites") are automatically disabled for non-admin users with helpful tooltips explaining why
+- **Graceful degradation** — The tool works with limited permissions and tells you exactly what features are available to you
+
 ---
 
 ## Security Rules
@@ -184,7 +190,7 @@ You need an Azure AD App Registration to connect to SharePoint Online.
 
 > **Why FullControl?** This is a read-only tool, but SharePoint treats reading RoleAssignments and RoleDefinitionBindings as a privileged operation. `Sites.Read.All` / `AllSites.Read` is insufficient.
 >
-> The signed-in user must also be a **SharePoint Administrator** for tenant-wide site enumeration to work.
+> **SharePoint Administrator role:** Tenant-wide site enumeration and storage data require this role. PermiX automatically detects your permissions on connection and shows you a **capability status display** indicating exactly what data you can access. Non-admin users can still analyze individual sites — the tool gracefully adapts to your permission level.
 
 Click **Grant admin consent** after adding all permissions.
 

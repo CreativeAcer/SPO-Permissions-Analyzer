@@ -106,17 +106,52 @@ function Handle-PostConnect {
         # Attempt connection
         Write-ActivityLog "Web UI connecting to: $($body.tenantUrl)" -Level "Information"
 
+        # Extract tenant name from URL for DeviceLogin authentication
+        # e.g., https://contoso.sharepoint.com or https://contoso-admin.sharepoint.com -> contoso.onmicrosoft.com
+        $tenantName = $null
+        if ($body.tenantUrl -match '//([^-\.]+)') {
+            # Extract base tenant name (before any hyphens like -admin or -my)
+            $tenantName = "$($matches[1]).onmicrosoft.com"
+        }
+
         if ($env:SPO_HEADLESS) {
             # Container/headless mode: use device code flow
             # The device code appears in the container terminal (podman logs / docker logs)
             Write-Host ""
-            Write-Host "  Device code authentication requested from Web UI" -ForegroundColor Yellow
-            Write-Host "  Tenant: $($body.tenantUrl)" -ForegroundColor White
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "  DEVICE CODE AUTHENTICATION" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "  Tenant URL: $($body.tenantUrl)" -ForegroundColor White
+            if ($tenantName) {
+                Write-Host "  Tenant ID: $tenantName" -ForegroundColor White
+            }
             Write-Host ""
-            Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin
+            Write-Host "  Initiating authentication..." -ForegroundColor Yellow
+            Write-Host "  (The device code will appear below)" -ForegroundColor Yellow
+            Write-Host ""
+
+            # Force interactive output by redirecting all streams and flushing
+            $originalOutput = [Console]::Out
+
+            try {
+                if ($tenantName) {
+                    Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
+                } else {
+                    Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin *>&1 | Out-Host
+                }
+            }
+            finally {
+                [Console]::Out.Flush()
+            }
+
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Green
+            Write-Host "  AUTHENTICATION COMPLETED" -ForegroundColor Green
+            Write-Host "========================================" -ForegroundColor Green
+            Write-Host ""
         }
         else {
-            # Host mode: use interactive browser popup
+            # Host mode: use interactive browser popup (doesn't need -Tenant parameter)
             Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
         }
 
@@ -135,12 +170,33 @@ function Handle-PostConnect {
         }
         catch { }
 
+        # Test user capabilities
+        $capabilities = $null
+        try {
+            Write-ActivityLog "Testing user capabilities..." -Level "Information"
+            $capabilities = Test-UserCapabilities
+        }
+        catch {
+            Write-ActivityLog "Capability check failed: $($_.Exception.Message)" -Level "Warning"
+            # Return safe defaults if capability check fails
+            # This ensures connection succeeds even if capability testing fails
+            $capabilities = @{
+                CanEnumerateSites = $false
+                CanReadUsers = $false
+                CanAccessStorageData = $false
+                CanReadExternalUsers = $false
+                CheckedAt = (Get-Date).ToString("o")
+                Error = "Capability check failed"
+            }
+        }
+
         Send-JsonResponse -Response $Response -Data @{
             success = $true
             message = "Connected to SharePoint Online"
             siteTitle = if ($web) { $web.Title } else { "SharePoint Site" }
             siteUrl = if ($web) { $web.Url } else { $body.tenantUrl }
             user = $currentUser
+            capabilities = $capabilities
         }
     }
     catch {
