@@ -45,9 +45,8 @@ async function handleGetSites() {
 }
 
 async function handleAnalyze() {
-    console.log('handleAnalyze called'); // Debug log
+    console.log('handleAnalyze called');
     const inputSiteUrl = document.getElementById('input-site-url').value.trim();
-    // Use the input site URL if provided, otherwise fall back to the connected site URL
     const siteUrl = inputSiteUrl || appState.connectedSiteUrl;
     const console_ = document.getElementById('operations-console');
 
@@ -60,13 +59,47 @@ async function handleAnalyze() {
         return;
     }
 
-    console_.textContent = `Starting permissions analysis for: ${siteUrl}\n`;
     setButtonLoading('btn-analyze', true);
 
     try {
-        console.log('Calling API.analyzePermissions with:', siteUrl);
+        // Step 1: Prepare analysis - check if re-auth is needed
+        console.log('Preparing analysis...');
+        const prepareRes = await API.prepareAnalysis(siteUrl);
+
+        if (!prepareRes.success && prepareRes.message) {
+            console_.textContent = `Error: ${prepareRes.message}`;
+            toast('Preparation failed', 'error');
+            return;
+        }
+
+        // If re-auth is needed, show message immediately
+        if (prepareRes.needsAuth) {
+            console_.textContent = '';
+            console_.textContent += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            console_.textContent += '📋 AUTHENTICATION REQUIRED\n';
+            console_.textContent += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            console_.textContent += '\n';
+            console_.textContent += 'Analyzing a different site requires re-authentication.\n';
+            console_.textContent += '\n';
+            console_.textContent += '👉 CHECK YOUR TERMINAL FOR DEVICE CODE\n';
+            console_.textContent += '\n';
+            console_.textContent += 'Run: podman logs <container>\n';
+            console_.textContent += '\n';
+            console_.textContent += 'Visit: https://microsoft.com/devicelogin\n';
+            console_.textContent += '\n';
+            console_.textContent += '⏳ Waiting for authentication...\n';
+
+            // Give user a moment to see the message
+            await new Promise(r => setTimeout(r, 500));
+        } else {
+            console_.textContent = `Starting permissions analysis for: ${siteUrl}\n`;
+        }
+
+        // Step 2: Execute analysis (will do auth if needed, then analyze)
+        console.log('Calling API.analyzePermissions...');
         const res = await API.analyzePermissions(siteUrl);
         console.log('API.analyzePermissions response:', res);
+
         if (res.started) {
             // Background operation — poll until complete
             const progress = await pollUntilComplete(console_);
@@ -92,6 +125,7 @@ async function handleAnalyze() {
         toast('Permissions analysis complete', 'success');
     } catch (e) {
         console_.textContent += `\nError: ${e.message}`;
+        toast('Analysis failed', 'error');
     } finally {
         setButtonLoading('btn-analyze', false);
     }

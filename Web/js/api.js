@@ -38,6 +38,10 @@ const API = {
         return this.post('sites');
     },
 
+    prepareAnalysis(siteUrl = '') {
+        return this.post('prepare-analysis', { siteUrl });
+    },
+
     analyzePermissions(siteUrl = '') {
         return this.post('permissions', { siteUrl });
     },

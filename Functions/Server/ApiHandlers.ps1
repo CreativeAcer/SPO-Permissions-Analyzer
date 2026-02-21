@@ -23,7 +23,8 @@ function Invoke-ApiHandler {
         "/api/connect"      { Handle-PostConnect -Request $Request -Response $Response }
         "/api/demo"         { Handle-PostDemo -Response $Response }
         "/api/sites"        { Handle-PostSites -Request $Request -Response $Response }
-        "/api/permissions"  { Handle-PostPermissions -Request $Request -Response $Response }
+        "/api/permissions"        { Handle-PostPermissions -Request $Request -Response $Response }
+        "/api/prepare-analysis"  { Handle-PostPrepareAnalysis -Request $Request -Response $Response }
         "/api/progress"     { Handle-GetProgress -Response $Response }
         "/api/data/*"       {
             $dataType = $Path.Replace("/api/data/", "")
@@ -118,10 +119,16 @@ function Handle-PostConnect {
         # Interactive mode can auto-switch, but DeviceLogin cannot
         $connectionUrl = $body.tenantUrl
         if ($env:SPO_HEADLESS) {
-            # Convert regular tenant URL to admin URL for DeviceLogin
+            # Convert tenant root URL to admin URL for DeviceLogin (for admin capabilities)
+            # But keep specific site URLs as-is
             if ($connectionUrl -notmatch '-admin\.sharepoint\.com') {
-                $connectionUrl = $connectionUrl -replace '(https://[^\.]+)\.sharepoint\.com', '$1-admin.sharepoint.com'
-                Write-ActivityLog "Using admin URL for DeviceLogin: $connectionUrl" -Level "Information"
+                # Check if this is a tenant root URL (no /sites/ or /teams/ path)
+                if ($connectionUrl -match '^https://[^/]+\.sharepoint\.com/?$') {
+                    # Tenant root - convert to admin for capability testing
+                    $connectionUrl = $connectionUrl -replace '(https://[^\.]+)\.sharepoint\.com', '$1-admin.sharepoint.com'
+                    Write-ActivityLog "Using admin URL for capability testing: $connectionUrl" -Level "Information"
+                }
+                # else: specific site URL - use as-is
             }
         }
 
@@ -288,6 +295,59 @@ function Handle-PostSites {
     Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Site retrieval started" }
 }
 
+# ---- Prepare Analysis (check if re-auth needed) ----
+
+function Handle-PostPrepareAnalysis {
+    param($Request, $Response)
+
+    if (-not $script:SPOConnected -and -not $script:DemoMode) {
+        Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Not connected" } -StatusCode 400
+        return
+    }
+
+    $body = Read-RequestBody -Request $Request
+    $siteUrl = if ($body -and $body.siteUrl) { $body.siteUrl } else { "" }
+
+    if ($script:DemoMode) {
+        Send-JsonResponse -Response $Response -Data @{
+            needsAuth = $false
+            ready = $true
+        }
+        return
+    }
+
+    # Check if re-authentication is needed (container mode + different site)
+    $needsReauth = $false
+    if ($env:SPO_HEADLESS -and $siteUrl) {
+        try {
+            $currentUrl = (Get-PnPConnection -ErrorAction SilentlyContinue).Url
+            $currentUrlNorm = if ($currentUrl) { $currentUrl.TrimEnd('/') } else { "" }
+            $targetUrlNorm = $siteUrl.TrimEnd('/')
+            $needsReauth = ($currentUrlNorm -ne $targetUrlNorm)
+        }
+        catch {
+            $needsReauth = $true
+        }
+    }
+
+    if ($needsReauth) {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $true
+            needsAuth = $true
+            currentSite = $currentUrl
+            targetSite = $siteUrl
+            message = "Re-authentication required for different site"
+        }
+    }
+    else {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $true
+            needsAuth = $false
+            ready = $true
+        }
+    }
+}
+
 # ---- Permissions Analysis ----
 
 function Handle-PostPermissions {
@@ -313,74 +373,75 @@ function Handle-PostPermissions {
         return
     }
 
-    # Launch in background so the server stays responsive for progress polling
+    # Prepare for operation
     $script:ServerState.OperationLog.Clear()
     $script:ServerState.OperationError = $null
     $script:ServerState.OperationSiteUrl = $siteUrl
+    $script:ServerState.OperationRunning = $true
+    $script:ServerState.OperationComplete = $false
 
-    # Container mode: Pre-authenticate to different sites before background job
-    # (DeviceLogin output won't work from background runspace)
+    # Check if re-authentication is needed (container mode, different site)
+    $needsReauth = $false
     if ($env:SPO_HEADLESS -and $siteUrl) {
         try {
             $currentUrl = (Get-PnPConnection -ErrorAction SilentlyContinue).Url
             $currentUrlNorm = if ($currentUrl) { $currentUrl.TrimEnd('/') } else { "" }
             $targetUrlNorm = $siteUrl.TrimEnd('/')
-
-            # If analyzing a different site, authenticate now in main runspace
-            if ($currentUrlNorm -ne $targetUrlNorm) {
-                [void]$script:ServerState.OperationLog.Add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                [void]$script:ServerState.OperationLog.Add("📋 AUTHENTICATION REQUIRED")
-                [void]$script:ServerState.OperationLog.Add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("Analyzing a different site requires re-authentication.")
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("👉 CHECK YOUR TERMINAL FOR DEVICE CODE")
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("Run: podman logs <container>")
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("Visit: https://microsoft.com/devicelogin")
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("⏳ Waiting for authentication...")
-
-                Write-Host ""
-                Write-Host "========================================" -ForegroundColor Cyan
-                Write-Host "  SITE-SPECIFIC AUTHENTICATION" -ForegroundColor Cyan
-                Write-Host "========================================" -ForegroundColor Cyan
-                Write-Host "  Target site: $siteUrl" -ForegroundColor White
-                Write-Host "  Initiating device code authentication..." -ForegroundColor Yellow
-                Write-Host ""
-
-                $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
-                $tenantName = ""
-                if ($siteUrl -match '//([^-\.]+)') {
-                    $tenantName = "$($matches[1]).onmicrosoft.com"
-                }
-
-                if ($tenantName) {
-                    Connect-PnPOnline -Url $siteUrl -ClientId $clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
-                } else {
-                    Connect-PnPOnline -Url $siteUrl -ClientId $clientId -DeviceLogin *>&1 | Out-Host
-                }
-                [Console]::Out.Flush()
-
-                Write-Host ""
-                Write-Host "  ✓ Authenticated to target site" -ForegroundColor Green
-                Write-Host "========================================" -ForegroundColor Cyan
-                Write-Host ""
-
-                [void]$script:ServerState.OperationLog.Add("")
-                [void]$script:ServerState.OperationLog.Add("✅ Authentication successful!")
-                [void]$script:ServerState.OperationLog.Add("")
-            }
+            $needsReauth = ($currentUrlNorm -ne $targetUrlNorm)
         }
         catch {
-            Write-ActivityLog "Pre-authentication failed: $($_.Exception.Message)" -Level "Warning"
-            [void]$script:ServerState.OperationLog.Add("")
-            [void]$script:ServerState.OperationLog.Add("❌ Authentication failed: $($_.Exception.Message)")
-            [void]$script:ServerState.OperationLog.Add("")
+            $needsReauth = $true
         }
     }
 
+    # If re-auth needed, do it before returning response
+    if ($needsReauth) {
+        [void]$script:ServerState.OperationLog.Add("Authenticating to target site...")
+
+        try {
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "  SITE-SPECIFIC AUTHENTICATION" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "  Target site: $siteUrl" -ForegroundColor White
+            Write-Host "  Initiating device code authentication..." -ForegroundColor Yellow
+            Write-Host ""
+
+            $clientId = Get-AppSetting -SettingName "SharePoint.ClientId"
+            $tenantName = ""
+            if ($siteUrl -match '//([^-\.]+)') {
+                $tenantName = "$($matches[1]).onmicrosoft.com"
+            }
+
+            if ($tenantName) {
+                Connect-PnPOnline -Url $siteUrl -ClientId $clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
+            } else {
+                Connect-PnPOnline -Url $siteUrl -ClientId $clientId -DeviceLogin *>&1 | Out-Host
+            }
+            [Console]::Out.Flush()
+
+            Write-Host ""
+            Write-Host "  ✓ Authenticated to target site" -ForegroundColor Green
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host ""
+
+            [void]$script:ServerState.OperationLog.Add("✅ Authentication successful!")
+        }
+        catch {
+            Write-ActivityLog "Authentication failed: $($_.Exception.Message)" -Level "Error"
+            [void]$script:ServerState.OperationLog.Add("❌ Authentication failed: $($_.Exception.Message)")
+            $script:ServerState.OperationRunning = $false
+            $script:ServerState.OperationComplete = $true
+            $script:ServerState.OperationError = "Authentication failed"
+            Send-JsonResponse -Response $Response -Data @{ success = $false; message = "Authentication failed: $($_.Exception.Message)" }
+            return
+        }
+    }
+
+    # Return response - authentication is done if it was needed
+    Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Permissions analysis started" }
+
+    # Start the actual analysis background job
     [void]$script:ServerState.OperationLog.Add("Starting permissions analysis...")
     Write-ActivityLog "Permissions analysis requested for site: '$siteUrl'" -Level "Information"
 
@@ -390,8 +451,6 @@ function Handle-PostPermissions {
         Get-RealPermissions-DataDriven -SiteUrl $siteUrl
         [void]$SharedState.OperationLog.Add("Analysis complete.")
     }
-
-    Send-JsonResponse -Response $Response -Data @{ success = $true; started = $true; message = "Permissions analysis started" }
 }
 
 # ---- Progress ----
