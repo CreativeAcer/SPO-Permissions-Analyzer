@@ -175,49 +175,62 @@ function Test-UserCapabilities {
     # Test 1: Site Enumeration (requires SharePoint Admin)
     try {
         Write-ActivityLog "Testing site enumeration capability..." -Level "Information"
-        $testSites = Get-PnPTenantSite -ErrorAction Stop | Select-Object -First 1
-        $capabilities.CanEnumerateSites = $null -ne $testSites
+        # Test permission by attempting the call - success means we have permission
+        # Don't check if data is returned, check if the call succeeds
+        $null = Get-PnPTenantSite -ErrorAction Stop
+        $capabilities.CanEnumerateSites = $true
         Write-ActivityLog "Site enumeration: ENABLED" -Level "Information"
     }
     catch {
-        Write-ActivityLog "Site enumeration: DISABLED ($($_.Exception.Message))" -Level "Information"
+        Write-ActivityLog "Site enumeration: DISABLED - $($_.Exception.Message)" -Level "Information"
         $capabilities.CanEnumerateSites = $false
     }
+
+    # Small delay to avoid throttling
+    Start-Sleep -Milliseconds 500
 
     # Test 2: User Read via Graph (requires User.Read.All)
     try {
         Write-ActivityLog "Testing Graph user read capability..." -Level "Information"
-        $testUsers = Invoke-PnPGraphMethod -Url "v1.0/users?`$top=1" -Method Get -ErrorAction Stop
-        $capabilities.CanReadUsers = $null -ne $testUsers
+        # Test permission by attempting the call - success means we have permission
+        $null = Invoke-PnPGraphMethod -Url "v1.0/users?`$top=1" -Method Get -ErrorAction Stop
+        $capabilities.CanReadUsers = $true
         Write-ActivityLog "User iteration: ENABLED" -Level "Information"
     }
     catch {
-        Write-ActivityLog "User iteration: DISABLED ($($_.Exception.Message))" -Level "Information"
+        Write-ActivityLog "User iteration: DISABLED - $($_.Exception.Message)" -Level "Information"
         $capabilities.CanReadUsers = $false
     }
+
+    # Small delay to avoid throttling
+    Start-Sleep -Milliseconds 500
 
     # Test 3: Storage Data (requires SharePoint Admin or Sites.FullControl.All)
     try {
         Write-ActivityLog "Testing storage data access..." -Level "Information"
-        $testStorage = Get-PnPTenantSite -Detailed -ErrorAction Stop |
-            Select-Object -First 1 -ExpandProperty StorageUsageCurrent
-        $capabilities.CanAccessStorageData = $null -ne $testStorage
+        # Test permission by attempting the call with -Detailed flag
+        $null = Get-PnPTenantSite -Detailed -ErrorAction Stop
+        $capabilities.CanAccessStorageData = $true
         Write-ActivityLog "Storage data: ENABLED" -Level "Information"
     }
     catch {
-        Write-ActivityLog "Storage data: LIMITED ($($_.Exception.Message))" -Level "Information"
+        Write-ActivityLog "Storage data: LIMITED - $($_.Exception.Message)" -Level "Information"
         $capabilities.CanAccessStorageData = $false
     }
+
+    # Small delay to avoid throttling
+    Start-Sleep -Milliseconds 500
 
     # Test 4: External User Data (requires User.Read.All)
     try {
         Write-ActivityLog "Testing external user data access..." -Level "Information"
-        $testExternal = Invoke-PnPGraphMethod -Url "v1.0/users?`$filter=userType eq 'Guest'&`$top=1" -Method Get -ErrorAction Stop
-        $capabilities.CanReadExternalUsers = $null -ne $testExternal
+        # Test permission by attempting the filtered query
+        $null = Invoke-PnPGraphMethod -Url "v1.0/users?`$filter=userType eq 'Guest'&`$top=1" -Method Get -ErrorAction Stop
+        $capabilities.CanReadExternalUsers = $true
         Write-ActivityLog "External user data: ENABLED" -Level "Information"
     }
     catch {
-        Write-ActivityLog "External user data: DISABLED ($($_.Exception.Message))" -Level "Information"
+        Write-ActivityLog "External user data: DISABLED - $($_.Exception.Message)" -Level "Information"
         $capabilities.CanReadExternalUsers = $false
     }
 

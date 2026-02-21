@@ -114,6 +114,17 @@ function Handle-PostConnect {
             $tenantName = "$($matches[1]).onmicrosoft.com"
         }
 
+        # For DeviceLogin (container), use admin URL to enable tenant-wide operations
+        # Interactive mode can auto-switch, but DeviceLogin cannot
+        $connectionUrl = $body.tenantUrl
+        if ($env:SPO_HEADLESS) {
+            # Convert regular tenant URL to admin URL for DeviceLogin
+            if ($connectionUrl -notmatch '-admin\.sharepoint\.com') {
+                $connectionUrl = $connectionUrl -replace '(https://[^\.]+)\.sharepoint\.com', '$1-admin.sharepoint.com'
+                Write-ActivityLog "Using admin URL for DeviceLogin: $connectionUrl" -Level "Information"
+            }
+        }
+
         if ($env:SPO_HEADLESS) {
             # Container/headless mode: use device code flow
             # The device code appears in the container terminal (podman logs / docker logs)
@@ -121,7 +132,8 @@ function Handle-PostConnect {
             Write-Host "========================================" -ForegroundColor Cyan
             Write-Host "  DEVICE CODE AUTHENTICATION" -ForegroundColor Cyan
             Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host "  Tenant URL: $($body.tenantUrl)" -ForegroundColor White
+            Write-Host "  Requested URL: $($body.tenantUrl)" -ForegroundColor White
+            Write-Host "  Connection URL: $connectionUrl" -ForegroundColor Yellow
             if ($tenantName) {
                 Write-Host "  Tenant ID: $tenantName" -ForegroundColor White
             }
@@ -135,9 +147,9 @@ function Handle-PostConnect {
 
             try {
                 if ($tenantName) {
-                    Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
+                    Connect-PnPOnline -Url $connectionUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin *>&1 | Out-Host
                 } else {
-                    Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin *>&1 | Out-Host
+                    Connect-PnPOnline -Url $connectionUrl -ClientId $body.clientId -DeviceLogin *>&1 | Out-Host
                 }
             }
             finally {
@@ -152,6 +164,7 @@ function Handle-PostConnect {
         }
         else {
             # Host mode: use interactive browser popup (doesn't need -Tenant parameter)
+            # Interactive mode can auto-switch to admin, so use the original URL
             Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Interactive
         }
 
