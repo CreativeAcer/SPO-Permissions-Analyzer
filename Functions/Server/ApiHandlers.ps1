@@ -126,23 +126,17 @@ function Handle-PostConnect {
                 Write-Host "  Tenant ID: $tenantName" -ForegroundColor White
             }
             Write-Host ""
-            Write-Host "  Waiting for device code..." -ForegroundColor Yellow
+            Write-Host "  Initiating authentication..." -ForegroundColor Yellow
             Write-Host ""
 
-            # Redirect errors to suppress clipboard warnings
+            # Disable clipboard to prevent xsel errors on Linux
+            $env:DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = 1
+
+            # Suppress warnings and connect
             if ($tenantName) {
-                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin 2>&1 | ForEach-Object {
-                    # Filter out clipboard warnings, show everything else
-                    if ($_ -notmatch 'xsel|clipboard') {
-                        Write-Host $_ -ForegroundColor White
-                    }
-                }
+                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -Tenant $tenantName -DeviceLogin -WarningAction SilentlyContinue
             } else {
-                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin 2>&1 | ForEach-Object {
-                    if ($_ -notmatch 'xsel|clipboard') {
-                        Write-Host $_ -ForegroundColor White
-                    }
-                }
+                Connect-PnPOnline -Url $body.tenantUrl -ClientId $body.clientId -DeviceLogin -WarningAction SilentlyContinue
             }
 
             Write-Host ""

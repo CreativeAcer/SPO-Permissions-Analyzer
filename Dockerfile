@@ -8,6 +8,9 @@
 
 FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04
 
+# Install xsel for clipboard support (required by PnP PowerShell on Linux)
+RUN apt-get update && apt-get install -y xsel && rm -rf /var/lib/apt/lists/*
+
 # Install PnP.PowerShell module
 RUN pwsh -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
     Install-Module -Name PnP.PowerShell -Scope AllUsers -Force -AcceptLicense"
