@@ -11,7 +11,7 @@ function initOperations() {
 async function handleGetSites() {
     const console_ = document.getElementById('operations-console');
     console_.textContent = 'Fetching sites...\n';
-    setButtonLoading('btn-get-sites', true);
+    UIHelpers.setButtonLoading('btn-get-sites', true);
 
     try {
         const res = await API.getSites();
@@ -40,7 +40,7 @@ async function handleGetSites() {
     } catch (e) {
         console_.textContent += `\nError: ${e.message}`;
     } finally {
-        setButtonLoading('btn-get-sites', false);
+        UIHelpers.setButtonLoading('btn-get-sites', false);
     }
 }
 
@@ -59,7 +59,7 @@ async function handleAnalyze() {
         return;
     }
 
-    setButtonLoading('btn-analyze', true);
+    UIHelpers.setButtonLoading('btn-analyze', true);
 
     try {
         // Step 1: Prepare analysis - check if re-auth is needed
@@ -133,7 +133,7 @@ async function handleAnalyze() {
         console_.textContent += `\nError: ${e.message}`;
         toast('Analysis failed', 'error');
     } finally {
-        setButtonLoading('btn-analyze', false);
+        UIHelpers.setButtonLoading('btn-analyze', false);
     }
 }
 

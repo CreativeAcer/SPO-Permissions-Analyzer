@@ -81,33 +81,6 @@ function Write-AuditEvent {
     Write-ActivityLog "AUDIT [$EventType] $Detail" -Level $(if ($EventType -eq "Error") { "Error" } else { "Information" })
 }
 
-function Register-AuditOutputFile {
-    <#
-    .SYNOPSIS
-    Registers an output file with its SHA256 hash for integrity verification
-    #>
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$FilePath
-    )
-
-    if (-not $script:AuditSession) { return }
-    if (-not (Test-Path $FilePath)) { return }
-
-    $hash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
-    $fileInfo = Get-Item $FilePath
-
-    $script:AuditSession.OutputFiles += @{
-        Path        = $FilePath
-        FileName    = $fileInfo.Name
-        SHA256      = $hash
-        SizeBytes   = $fileInfo.Length
-        GeneratedAt = (Get-Date).ToString("o")
-    }
-
-    Write-AuditEvent -EventType "Export" -Detail "Output file: $($fileInfo.Name) (SHA256: $($hash.Substring(0,16))...)" -AffectedObject $FilePath
-}
-
 function Complete-AuditSession {
     <#
     .SYNOPSIS

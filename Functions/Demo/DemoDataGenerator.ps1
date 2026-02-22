@@ -33,7 +33,7 @@ function New-DemoData {
         @{Title="Executive Dashboard"; Url="https://contoso.sharepoint.com/sites/exec"; Owner="ceo@contoso.com"; Storage="200"; Template="SITEPAGEPUBLISHING#0"; LastModified="2024-12-15"; UserCount=8; GroupCount=3}
     )
     foreach ($site in $demoSites) { Add-SharePointSite -SiteData $site }
-    Add-OperationLog "Added $($demoSites.Count) demo sites"
+    Write-ConsoleOutput "Added $($demoSites.Count) demo sites"
 
     # Generate demo users (with diverse external users for risk testing)
     Set-SharePointOperationContext -OperationType "Demo - Permissions"
@@ -69,7 +69,7 @@ function New-DemoData {
         @{Name="Freelancer"; Email="freelance@personal-domain.me"; Type="External"; Permission="Edit"; IsExternal=$true}
     )
     foreach ($user in $demoUsers) { Add-SharePointUser -UserData $user }
-    Add-OperationLog "Added $($demoUsers.Count) demo users (including $(@($demoUsers | Where-Object {$_.IsExternal}).Count) external)"
+    Write-ConsoleOutput "Added $($demoUsers.Count) demo users (including $(@($demoUsers | Where-Object {$_.IsExternal}).Count) external)"
 
     # Generate demo groups (includes empty groups for GRP-001)
     $demoGroups = @(
@@ -85,7 +85,7 @@ function New-DemoData {
         @{Name="Archive Access"; MemberCount=0; Permission="Read"; Description="Empty archive group"}
     )
     foreach ($group in $demoGroups) { Add-SharePointGroup -GroupData $group }
-    Add-OperationLog "Added $($demoGroups.Count) demo groups (including $(@($demoGroups | Where-Object {$_.MemberCount -eq 0}).Count) empty)"
+    Write-ConsoleOutput "Added $($demoGroups.Count) demo groups (including $(@($demoGroups | Where-Object {$_.MemberCount -eq 0}).Count) empty)"
 
     # Generate demo role assignments (includes many Full Control and direct user assignments)
     $demoRoles = @(
@@ -123,7 +123,7 @@ function New-DemoData {
     foreach ($ra in $demoRoles) { Add-SharePointRoleAssignment -RoleData $ra }
     $fullControlCount = @($demoRoles | Where-Object {$_.Role -eq "Full Control"}).Count
     $directUserCount = @($demoRoles | Where-Object {$_.PrincipalType -eq "User"}).Count
-    Add-OperationLog "Added $($demoRoles.Count) role assignments ($fullControlCount Full Control, $directUserCount direct user assignments)"
+    Write-ConsoleOutput "Added $($demoRoles.Count) role assignments ($fullControlCount Full Control, $directUserCount direct user assignments)"
 
     # Generate demo inheritance items
     $demoInheritance = @(
@@ -139,7 +139,7 @@ function New-DemoData {
         @{Title="Style Library"; Type="Document Library"; Url="/sites/teamsite/Style Library"; HasUniquePermissions=$false; ParentUrl="https://contoso.sharepoint.com/sites/teamsite"; RoleAssignmentCount=0; SiteTitle="Team Collaboration Site"}
     )
     foreach ($item in $demoInheritance) { Add-SharePointInheritanceItem -InheritanceData $item }
-    Add-OperationLog "Added $($demoInheritance.Count) inheritance items"
+    Write-ConsoleOutput "Added $($demoInheritance.Count) inheritance items"
 
     # Generate demo sharing links (includes anonymous edit links and many company-wide links)
     $demoLinks = @(
@@ -173,13 +173,13 @@ function New-DemoData {
     $anonymousCount = @($demoLinks | Where-Object {$_.LinkType -eq "Anonymous"}).Count
     $anonymousEditCount = @($demoLinks | Where-Object {$_.LinkType -eq "Anonymous" -and $_.AccessLevel -eq "Edit"}).Count
     $orgWideCount = @($demoLinks | Where-Object {$_.LinkType -in @("Company-wide", "Organization")}).Count
-    Add-OperationLog "Added $($demoLinks.Count) sharing links ($anonymousCount anonymous with $anonymousEditCount edit, $orgWideCount company-wide)"
+    Write-ConsoleOutput "Added $($demoLinks.Count) sharing links ($anonymousCount anonymous with $anonymousEditCount edit, $orgWideCount company-wide)"
 
     $metrics = Get-SharePointData -DataType "Metrics"
-    Add-OperationLog ""
-    Add-OperationLog "Demo mode ready!"
-    Add-OperationLog "Sites: $($metrics.TotalSites) | Users: $($metrics.TotalUsers) | Groups: $($metrics.TotalGroups)"
-    Add-OperationLog "External: $($metrics.ExternalUsers) | Roles: $($metrics.TotalRoleAssignments) | Inheritance Breaks: $($metrics.InheritanceBreaks) | Links: $($metrics.TotalSharingLinks)"
+    Write-ConsoleOutput ""
+    Write-ConsoleOutput "Demo mode ready!"
+    Write-ConsoleOutput "Sites: $($metrics.TotalSites) | Users: $($metrics.TotalUsers) | Groups: $($metrics.TotalGroups)"
+    Write-ConsoleOutput "External: $($metrics.ExternalUsers) | Roles: $($metrics.TotalRoleAssignments) | Inheritance Breaks: $($metrics.InheritanceBreaks) | Links: $($metrics.TotalSharingLinks)"
 }
 
 function Invoke-DemoEnrichment {

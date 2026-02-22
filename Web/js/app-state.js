@@ -30,25 +30,6 @@ function formatStorage(mb) {
     return mb + ' MB';
 }
 
-function setButtonLoading(id, loading) {
-    // Use UIHelpers if available for modern loading spinner
-    if (typeof UIHelpers !== 'undefined') {
-        UIHelpers.setButtonLoading(id, loading);
-    } else {
-        // Fallback to text-based loading
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        if (loading) {
-            btn.dataset.originalText = btn.textContent;
-            btn.textContent = 'Loading...';
-            btn.classList.add('btn-disabled');
-        } else {
-            btn.textContent = btn.dataset.originalText || btn.textContent;
-            btn.classList.remove('btn-disabled');
-        }
-    }
-}
-
 function toast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;

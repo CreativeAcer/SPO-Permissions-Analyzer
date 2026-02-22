@@ -238,8 +238,8 @@ function Handle-PostDemo {
         $script:ServerState.OperationRunning = $true
         $script:ServerState.OperationComplete = $false
 
-        Add-OperationLog "Starting Demo Mode..."
-        Add-OperationLog "Generating simulated SharePoint data..."
+        Write-ConsoleOutput "Starting Demo Mode..."
+        Write-ConsoleOutput "Generating simulated SharePoint data..."
 
         # Delegate to DemoDataGenerator
         New-DemoData

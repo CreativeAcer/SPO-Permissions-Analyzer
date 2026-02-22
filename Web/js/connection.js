@@ -29,7 +29,7 @@ async function handleConnect() {
     } else {
         results.textContent = 'Connecting to SharePoint Online...\nPlease complete authentication in the popup window.';
     }
-    setButtonLoading('btn-connect', true);
+    UIHelpers.setButtonLoading('btn-connect', true);
 
     try {
         const res = await API.connect(tenantUrl, clientId);
@@ -60,14 +60,14 @@ async function handleConnect() {
         results.textContent = `Error: ${e.message}`;
         toast('Connection failed', 'error');
     } finally {
-        setButtonLoading('btn-connect', false);
+        UIHelpers.setButtonLoading('btn-connect', false);
     }
 }
 
 async function handleDemo() {
     const results = document.getElementById('connection-results');
     results.textContent = 'Starting Demo Mode...\nGenerating sample SharePoint data...';
-    setButtonLoading('btn-demo', true);
+    UIHelpers.setButtonLoading('btn-demo', true);
 
     try {
         const res = await API.startDemo();
@@ -105,7 +105,7 @@ async function handleDemo() {
     } catch (e) {
         results.textContent = `Error: ${e.message}`;
     } finally {
-        setButtonLoading('btn-demo', false);
+        UIHelpers.setButtonLoading('btn-demo', false);
     }
 }
 
@@ -128,61 +128,6 @@ function updateConnectionUI(connected) {
         dot.classList.remove('connected');
         dot.classList.add('disconnected');
         text.textContent = 'Not connected';
-    }
-}
-
-// --- Status polling (lightweight, once on load) ---
-async function pollStatus() {
-    try {
-        const status = await API.getStatus();
-        appState.headless = !!status.headless;
-
-        // Show container auth note if headless
-        if (appState.headless) {
-            const note = document.getElementById('headless-note');
-            if (note) note.classList.remove('hidden');
-        }
-
-        if (status.connected) {
-            appState.connected = true;
-            appState.demoMode = status.demoMode;
-            if (status.metrics && status.metrics.totalSites > 0) {
-                appState.dataLoaded = true;
-            }
-
-            // For pre-existing connections, assume full capabilities if demo mode
-            // otherwise assume limited capabilities (user should re-connect for fresh check)
-            if (status.demoMode) {
-                appState.capabilities = {
-                    CanEnumerateSites: true,
-                    CanReadUsers: true,
-                    CanAccessStorageData: true,
-                    CanReadExternalUsers: true
-                };
-            } else {
-                // Assume limited capabilities on reconnect
-                // User can re-connect to get fresh capability check
-                appState.capabilities = {
-                    CanEnumerateSites: false,
-                    CanReadUsers: false,
-                    CanAccessStorageData: false,
-                    CanReadExternalUsers: false
-                };
-            }
-
-            updateConnectionUI(true);
-            updateTabVisibility(true);
-            updateOperationsButtons(appState.capabilities);
-
-            // Show pre-connected message
-            const results = document.getElementById('connection-results');
-            if (results && !appState.demoMode) {
-                results.textContent = 'Already connected to SharePoint Online.\nRe-connect to refresh capability status.';
-            }
-            if (appState.dataLoaded) await refreshAnalytics();
-        }
-    } catch (e) {
-        // Server not ready yet, ignore
     }
 }
 

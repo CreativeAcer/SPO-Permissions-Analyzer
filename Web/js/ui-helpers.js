@@ -56,13 +56,6 @@ const UIHelpers = {
     },
 
     /**
-     * Clear skeletons and show actual content
-     */
-    clearMetricSkeletons() {
-        // Metric values will be populated by the normal refresh function
-    },
-
-    /**
      * Show loading overlay
      * @param {string} message - Optional loading message
      */

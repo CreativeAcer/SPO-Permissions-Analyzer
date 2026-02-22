@@ -238,18 +238,6 @@ function Read-RequestBody {
     return $null
 }
 
-function Add-OperationLog {
-    <#
-    .SYNOPSIS
-    Adds a message to the operation log (replaces Write-ConsoleOutput for web mode)
-    #>
-    param(
-        [string]$Message
-    )
-
-    [void]$script:ServerState.OperationLog.Add($Message)
-}
-
 function Stop-WebServer {
     <#
     .SYNOPSIS

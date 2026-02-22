@@ -72,27 +72,6 @@ function Update-Checkpoint {
     Save-CheckpointFile
 }
 
-function Complete-CheckpointPhase {
-    <#
-    .SYNOPSIS
-    Marks a phase as completed in the checkpoint
-    #>
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$PhaseName
-    )
-
-    if (-not $script:CheckpointData) { return }
-
-    if ($PhaseName -notin $script:CheckpointData.CompletedPhases) {
-        $script:CheckpointData.CompletedPhases += $PhaseName
-    }
-    $script:CheckpointData.LastUpdated = (Get-Date).ToString("o")
-
-    Save-CheckpointFile
-    Write-ActivityLog "Checkpoint phase complete: $PhaseName" -Level "Information"
-}
-
 function Complete-Checkpoint {
     <#
     .SYNOPSIS
@@ -147,20 +126,6 @@ function Get-Checkpoint {
     }
 
     return $null
-}
-
-function Test-PhaseCompleted {
-    <#
-    .SYNOPSIS
-    Checks if a specific phase was already completed (for resume)
-    #>
-    param(
-        [string]$PhaseName,
-        $CheckpointData
-    )
-
-    if (-not $CheckpointData) { return $false }
-    return $PhaseName -in $CheckpointData.CompletedPhases
 }
 
 function Save-CheckpointFile {
